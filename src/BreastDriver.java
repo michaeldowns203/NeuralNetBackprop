@@ -3,8 +3,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
-//10% cross validation for tuning
+
+// 10% cross-validation for tuning
 public class BreastDriver {
+
     public static List<List<Object>> extractTenPercent(List<List<Object>> dataset) {
         // Create a map to hold instances of each class
         Map<String, List<List<Object>>> classMap = new HashMap<>();
@@ -74,7 +76,6 @@ public class BreastDriver {
 
         return chunks;
     }
-
 
     public static void main(String[] args) throws IOException {
         String inputFile1 = "src/breast-cancer-wisconsin.data";
@@ -158,12 +159,12 @@ public class BreastDriver {
                     }
                 }
 
-                // Initialize and train the k-NN model
-                int k = 10; // You can tune this value later
-                KNN knn = new KNN(k, 1, 1); // Bandwidth and error threshold are irrelevant
-                knn.fit(trainingData, trainingLabels);
-                //knn.edit();
-                //knn.kMeansAndReduce(600, 1000);
+                // Initialize the neural network
+                List<Integer> hiddenLayerSizes = Arrays.asList(9); // Example hidden layer sizes
+                FFNeuralNetwork neuralNetwork = new FFNeuralNetwork(9, hiddenLayerSizes, 9, true);
+
+                // Train the neural network
+                neuralNetwork.train(trainingData, trainingLabels, 1000, 0.01);
 
                 // Test the classifier using the test set
                 int correctPredictions = 0;
@@ -182,7 +183,7 @@ public class BreastDriver {
                         testInstance.add((Double) testSet.get(j).get(l));
                     }
 
-                    String predicted = knn.predict(testInstance);
+                    String predicted = neuralNetwork.predict(testInstance).toString();
                     String actual = testLabels.get(j);
 
                     // Print the test data, predicted label, and actual label
