@@ -2,10 +2,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 //10% cross validation for tuning
 public class ComputerDriverP {
@@ -241,50 +238,76 @@ public class ComputerDriverP {
                     stringScaledTrainingLabels.add(String.valueOf(d)); // or d.toString();
                 }
 
-                // Initialize and train the k-NN model
-                int k = 3; // You can tune this value later
-                KNNPrint knn = new KNNPrint(k, 5, 100);
-                knn.fit(trainingData, trainingLabels);
-                //knn.editR();
-                knn.kMeansAndReduceRegression(150, 1000);
+// Convert to arrays for neural network input
+                double[][] trainInputs = new double[scaledTrainingData.size()][];
+                double[][] trainLabels = new double[scaledTrainingLabels.size()][1];
 
-                // Test the classifier
-                for (int j = 0; j < testData.size(); j++) {
-                    List<Double> testInstance = new ArrayList<>();
-                    for (int l = 0; l < testData.get(j).size() - 1; l++) {
-                        testInstance.add((Double) testData.get(j).get(l));
-                    }
-
-                    double predicted = knn.predictValue(testInstance);
-                    double actual = Double.parseDouble(testLabels.get(j));
-                    predictedList.add(predicted);
-                    actualList.add(actual);
-
-                    // Print the test data, predicted label, and actual label
-                    System.out.print("Test Data: [ ");
-                    for (Double feature : testInstance) {
-                        System.out.print(feature + " ");
-                    }
-                    System.out.println("] Predicted: " + predicted + " Actual: " + actual);
-
-                    knn.demonstrateRegression(testInstance);
-
+                // Convert training data and labels to arrays
+                for (int t = 0; t < scaledTrainingData.size(); t++) {
+                    trainInputs[t] = scaledTrainingData.get(t).stream().mapToDouble(Double::doubleValue).toArray();
+                    trainLabels[t][0] = scaledTrainingLabels.get(t);
                 }
 
-                double mse = knn.calculateMSE(actualList, predictedList);
-                totalMSE += mse;
+                // Convert test data and labels to arrays
+                double[][] testInputs = new double[scaledTestData.size()][];
+                double[][] testLabelsArray = new double[scaledTestLabels.size()][1];
 
-                // Print loss info
+                for (int t = 0; t < scaledTestData.size(); t++) {
+                    testInputs[t] = scaledTestData.get(t).stream().mapToDouble(Double::doubleValue).toArray();
+                    testLabelsArray[t][0] = scaledTestLabels.get(t);
+                }
+
+                // Initialize the neural network for regression
+                int inputSize = trainInputs[0].length;  // Number of features
+                int[] hiddenLayerSizes = {5, 3};  // You can change these as needed
+                int outputSize = 1;  // Regression problem (single continuous output)
+                String activationType = "linear";  // Use linear activation for regression
+                double learningRate = 0.01;
+                boolean useMomentum = false;  // Momentum is optional in regression
+                double momentumCoefficient = 0.0;  // Set to 0 since we aren't using momentum
+
+                NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
+
+                // Train the neural network using the training data
+                int maxEpochs = 1000;  // You can adjust the number of epochs
+                neuralNet.train(trainInputs, trainLabels, maxEpochs);
+
+                // After training, test the neural network on the test data
+                for (int t = 0; t < testInputs.length; t++) {
+                    double[] prediction = neuralNet.forwardPass(testInputs[t]);
+                    double actual = testLabelsArray[t][0];
+
+                    // Store the predicted and actual values for MSE calculation
+                    predictedList.add(prediction[0]);
+                    actualList.add(actual);
+
+                    // Print test results
+                    System.out.printf("Test Instance: %s | Predicted: %.4f | Actual: %.4f%n",
+                            Arrays.toString(testInputs[t]), prediction[0], actual);
+                }
+
+                // Calculate and print the Mean Squared Error for this fold
+                double mse = calculateMSE(actualList, predictedList);
+                totalMSE += mse;
                 System.out.println("Fold " + (i + 1) + " Mean Squared Error: " + mse);
             }
 
-            // Average mse across all 10 folds
+            // Calculate and print the average MSE across all 10 folds
             double averageMSE = totalMSE / 10;
-            System.out.println("Average Mean Squared Error: " + averageMSE);
+            System.out.println("Average Mean Squared Error across 10 folds: " + averageMSE);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    // Method to calculate Mean Squared Error (MSE)
+    public static double calculateMSE(List<Double> actual, List<Double> predicted) {
+        double sum = 0;
+        for (int i = 0; i < actual.size(); i++) {
+            double error = actual.get(i) - predicted.get(i);
+            sum += error * error;
+        }
+        return sum / actual.size();
+    }
 }
