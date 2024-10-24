@@ -132,27 +132,39 @@ public class ComputerDriverMinMaxTest {
             double totalMSE = 0;
 
             for (int i = 0; i < 10; i++) {
+                List<List<Object>> trainingSet = new ArrayList<>();
                 List<List<Double>> trainingData = new ArrayList<>();
                 List<List<Double>> trainingLabels = new ArrayList<>();
                 List<Double> predictedList = new ArrayList<>();
                 List<Double> actualList = new ArrayList<>();
-                List<List<Object>> testData = testSet;
+
 
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            List<Double> features = new ArrayList<>();
-                            for (int k = 0; k < row.size() - 1; k++) {
-                                features.add((Double) row.get(k));
+                            List<Object> all = new ArrayList<>();
+                            for (int k = 0; k < row.size(); k++) {
+                                all.add((Double) row.get(k));
                             }
-                            trainingData.add(features);
-                            trainingLabels.add(Collections.singletonList((Double) row.get(row.size() - 1)));
+                            trainingSet.add(all);
                         }
                     }
                 }
 
-                List<List<Double>> scaledTrainingData = minMaxScale(new ArrayList<>(dataset));
-                List<List<Double>> scaledTestData = minMaxScale(testData);
+                List<List<Double>> scaledTrainingData = minMaxScale(trainingSet);
+                List<List<Double>> scaledTestData = minMaxScale(testSet);
+
+                // Loop through the scaledTrainingData to extract features and labels
+                for (int j = 0; j < scaledTrainingData.size(); j++) {
+                    if (j != i) { // If excluding a specific chunk (e.g., for cross-validation)
+                        List<Double> row = scaledTrainingData.get(j);
+                        List<Double> features = new ArrayList<>(row.subList(0, row.size() - 1)); // All but the last element
+                        Double label = row.get(row.size() - 1); // The last element as the label
+
+                        trainingData.add(features); // Add features to trainingData
+                        trainingLabels.add(Collections.singletonList(label)); // Add label to trainingLabels
+                    }
+                }
 
                 double[][] trainInputs = new double[trainingData.size()][];
                 double[][] trainOutputs = new double[trainingLabels.size()][];
@@ -169,10 +181,10 @@ public class ComputerDriverMinMaxTest {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {5, 3};
+                int[] hiddenLayerSizes = {6, 4};
                 int outputSize = 1;
                 String activationType = "linear";
-                double learningRate = 0.0001;
+                double learningRate = 0.01;
                 boolean useMomentum = false;
                 double momentumCoefficient = 0.01;
 
