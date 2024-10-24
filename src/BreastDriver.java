@@ -181,7 +181,7 @@ public class BreastDriver {
             int[] hiddenLayerSizes = {5, 3};  // Example: 2 hidden layers, with 5 and 3 neurons respectively
             int outputSize = 1;  // Single output for classification (e.g., binary or multi-class)
             String activationType = "softmax";  // Use softmax for classification
-            double learningRate = 0.01;  // Learning rate for gradient descent
+            double learningRate = 0.0001;  // Learning rate for gradient descent
             boolean useMomentum = false;  // Disable momentum in this example
             double momentumCoefficient = 0.0;  // Momentum coefficient (irrelevant if useMomentum is false)
 
@@ -223,7 +223,7 @@ public class BreastDriver {
                 }
 
                 // Train the neural network
-                neuralNet.train(trainInputs, trainLabels, 1000);  // Train for 1000 epochs
+                neuralNet.train(trainInputs, trainLabels, 100);  // Train for 1000 epochs
 
                 // Prepare test data for the current fold
                 List<List<Double>> testData = new ArrayList<>();
@@ -253,11 +253,15 @@ public class BreastDriver {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
 
                     // Convert prediction (softmax might return probabilities) to label
-                    int predictedLabel = (prediction[0] >= 0.5) ? 1 : 0; // Adjust this based on your actual classification
+                    int predictedLabel = (prediction[0] >= 0.5) ? 4 : 2; // Adjust this based on your actual classification
 
                     if (predictedLabel == (int) testLabels[t][0]) {
                         correctPredictions++;
                     }
+
+                    // Print test results
+                    System.out.printf("Test Instance: %s | Predicted: %.4f | Actual: %d\n",
+                            Arrays.toString(testInputs[t]), prediction[0], (int) testLabels[t][0]);
                 }
 
                 // Calculate accuracy

@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -52,14 +53,22 @@ public class NeuralNetwork {
         biases.add(new double[outputSize]);
         deltaWeights.add(new double[hiddenLayerSizes[hiddenLayerSizes.length - 1]][outputSize]);
 
-        // Randomly initialize weights and biases
+        //xaiver initialization
         for (double[][] layerWeights : weights) {
             for (int i = 0; i < layerWeights.length; i++) {
                 for (int j = 0; j < layerWeights[i].length; j++) {
-                    layerWeights[i][j] = rand.nextDouble(); // Uniform initialization between 0 and 1
+                    layerWeights[i][j] = rand.nextGaussian() * Math.sqrt(2.0 / (layerWeights.length + layerWeights[0].length));
+
                 }
             }
         }
+        // Random initialization for biases
+        for (int i = 0; i < biases.size(); i++) {
+            for (int j = 0; j < biases.get(i).length; j++) {
+                biases.get(i)[j] = rand.nextGaussian() * 0.01;  // Small random values for bias
+            }
+        }
+
     }
 
     // Sigmoid activation function for hidden layers
@@ -81,8 +90,8 @@ public class NeuralNetwork {
     }
 
     public double[] forwardPass(double[] input) {
-        // Debugging: Print the input size before starting the forward pass
-        System.out.println("Input size: " + input.length);
+        // Clear layerOutputs at the beginning of every forward pass
+        layerOutputs.clear();
 
         // Set inputLayer if it's not already set
         if (inputLayer == null) {
@@ -93,13 +102,11 @@ public class NeuralNetwork {
 
         // Store the input layer in layerOutputs
         storeLayerOutput(0, currentOutput);
+
         // Loop through hidden layers
         for (int i = 0; i < weights.size() - 1; i++) {
             int previousLayerSize = currentOutput.length;
             int currentLayerSize = weights.get(i)[0].length; // Number of neurons in the current layer
-
-            // Debugging: Print size info
-            System.out.println("Layer " + i + ": previousLayerSize = " + previousLayerSize + ", currentLayerSize = " + currentLayerSize);
 
             double[] newOutput = new double[currentLayerSize]; // New output size
 
@@ -133,9 +140,13 @@ public class NeuralNetwork {
                 z[j] += currentOutput[k] * weights.get(weights.size() - 1)[k][j]; // Last layer's weights
             }
             z[j] += biases.get(biases.size() - 1)[j];
+        }
 
-            // Use softmax or linear activation for output layer
-            finalOutput[j] = activationType.equals("softmax") ? softmax(z)[j] : z[j];
+        // Apply softmax to the entire output vector if softmax is the activation type
+        if (activationType.equals("softmax")) {
+            finalOutput = softmax(z);
+        } else {
+            finalOutput = z; // For linear activation
         }
 
         // Store the output of the output layer
@@ -147,9 +158,11 @@ public class NeuralNetwork {
 
 
 
+
     // Backpropagation
     public void backPropagation(double[] actualOutput, double[] predictedOutput) {
         double[] error = new double[predictedOutput.length];
+
         if (activationType.equals("softmax")) {
             // Cross Entropy Loss for Classification
             for (int i = 0; i < predictedOutput.length; i++) {
@@ -166,6 +179,10 @@ public class NeuralNetwork {
         int lastLayerIdx = weights.size() - 1;
         double[] delta = error.clone();
 
+        // Apply gradient clipping
+        clipGradients(delta, 5.0); // Clipping value of 5.0, you can adjust this
+
+        // Update weights for the output layer
         updateWeights(lastLayerIdx, delta);
 
         // Backpropagate through hidden layers
@@ -179,10 +196,15 @@ public class NeuralNetwork {
                 double sigmoidDerivative = sigmoid(biases.get(layerIdx)[i]) * (1 - sigmoid(biases.get(layerIdx)[i]));
                 newDelta[i] = gradient * sigmoidDerivative;
             }
+
+            // Apply gradient clipping for the current layer's delta
+            //clipGradients(newDelta, 10);  // Again, clipping value of 5.0
+
             delta = newDelta;
             updateWeights(layerIdx, delta);
         }
     }
+
 
     private void updateWeights(int layerIdx, double[] delta) {
         double[][] weightMatrix = weights.get(layerIdx);
@@ -190,7 +212,13 @@ public class NeuralNetwork {
         // Use inputLayer for the first layer, and layerOutputs for the others
         double[] inputLayerForWeights = (layerIdx == 0) ? inputLayer : outputLayer(layerIdx - 1); // Get inputs from inputLayer or previous layer
 
+
         for (int i = 0; i < weightMatrix.length; i++) {
+            // Update biases similarly to weights
+            for (int j = 0; j < biases.get(layerIdx).length; j++) {
+                biases.get(layerIdx)[j] += -learningRate * delta[j];
+            }
+
             for (int j = 0; j < weightMatrix[i].length; j++) {
                 double gradient = delta[j] * inputLayerForWeights[i]; // Correct input source for the current layer
                 double deltaW = -learningRate * gradient;
@@ -235,11 +263,12 @@ public class NeuralNetwork {
     // Store the output of each layer after forward pass
     private void storeLayerOutput(int layerIdx, double[] output) {
         if (layerOutputs.size() > layerIdx) {
-            layerOutputs.set(layerIdx, output);  // Update output
+            layerOutputs.set(layerIdx, output);  // Update output if it already exists
         } else {
-            layerOutputs.add(output);  // Add new output
+            layerOutputs.add(output);  // Add new output if it doesn't exist
         }
     }
+
 
     public void train (double[][] inputData, double[][] targetData, int maxEpochs){
         for (int epoch = 0; epoch < maxEpochs; epoch++) {
@@ -249,6 +278,16 @@ public class NeuralNetwork {
 
                 double[] predictedOutput = forwardPass(input);
                 backPropagation(target, predictedOutput);
+            }
+        }
+    }
+
+    private void clipGradients(double[] gradients, double clipValue) {
+        for (int i = 0; i < gradients.length; i++) {
+            if (gradients[i] > clipValue) {
+                gradients[i] = clipValue;
+            } else if (gradients[i] < -clipValue) {
+                gradients[i] = -clipValue;
             }
         }
     }

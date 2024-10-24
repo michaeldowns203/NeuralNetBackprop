@@ -7,18 +7,22 @@ import java.util.*;
 //10% cross validation for tuning
 public class AbaloneDriver {
     // Method to scale labels using Min-Max Scaling
-    public static List<Double> minMaxScaleLabels(List<Double> labels) {
-        // Scale the labels using Min-Max scaling
-        double minLabel = Collections.min(labels);
-        double maxLabel = Collections.max(labels);
+    public static List<Double> minMaxScaleLabels(List<Double> labels, double minLabel, double maxLabel) {
+        // Scale the labels using Min-Max scaling based on provided min and max values
         List<Double> scaledLabels = new ArrayList<>();
         for (double label : labels) {
-            double scaledLabel = (label - minLabel) / (maxLabel - minLabel);
+            double scaledLabel;
+            if (minLabel == maxLabel) {
+                scaledLabel = 0.0;  // Avoid division by zero if min and max are the same
+            } else {
+                scaledLabel = (label - minLabel) / (maxLabel - minLabel);
+            }
             scaledLabels.add(scaledLabel);
         }
 
         return scaledLabels;  // Return the scaled labels
     }
+
 
 
     // Method to scale features using Min-Max Scaling
@@ -42,7 +46,12 @@ public class AbaloneDriver {
             List<Double> scaledRow = new ArrayList<>();
             for (int i = 0; i < numFeatures; i++) {
                 double value = row.get(i);
-                double scaledValue = (value - minValues.get(i)) / (maxValues.get(i) - minValues.get(i));
+                double scaledValue;
+                if (minValues.get(i).equals(maxValues.get(i))) {
+                    scaledValue = 0.0;  // Avoid division by zero if min and max are the same
+                } else {
+                    scaledValue = (value - minValues.get(i)) / (maxValues.get(i) - minValues.get(i));
+                }
                 scaledRow.add(scaledValue);
             }
             scaledData.add(scaledRow);  // Only include scaled features
@@ -128,7 +137,6 @@ public class AbaloneDriver {
     }
 
 
-
     public static void main(String[] args) throws IOException {
         String inputFile1 = "src/abalone.data";
         try {
@@ -193,22 +201,18 @@ public class AbaloneDriver {
             for (int i = 0; i < 10; i++) {
                 // Create training and testing sets
                 List<List<Double>> trainingData = new ArrayList<>();
-                List<String> trainingLabels = new ArrayList<>();
+                List<Double> trainingLabels = new ArrayList<>();
 
                 List<Double> predictedList = new ArrayList<>();
                 List<Double> actualList = new ArrayList<>();
 
                 List<List<Object>> testData = testSet;
-                List<String> testLabels = new ArrayList<>();
-                for (List<Object> row : testData) {
-                    testLabels.add(String.valueOf(row.get(row.size() - 1))); // Last column is label
-                }
 
                 // Combine the other 9 chunks into the training set
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            trainingLabels.add(String.valueOf(row.get(row.size() - 1)));  // Last column is label
+                            trainingLabels.add((Double) row.get(row.size() - 1));  // Last column is label
                             List<Double> features = new ArrayList<>();
                             for (int k = 0; k < row.size() - 1; k++) {
                                 features.add((Double) row.get(k));
@@ -218,6 +222,7 @@ public class AbaloneDriver {
                     }
                 }
 
+                // Scale the training and test data
                 List<List<Double>> scaledTrainingData = minMaxScale(trainingData);
                 List<List<Double>> doubleTestData = new ArrayList<>();
                 for (List<Object> innerList : testData) {
@@ -229,23 +234,22 @@ public class AbaloneDriver {
                 }
                 List<List<Double>> scaledTestData = minMaxScale(doubleTestData);
 
-                List<Double> doubleTrainingLabels = new ArrayList<>();
-                for (String str : trainingLabels) {
-                    doubleTrainingLabels.add(Double.parseDouble(str));
-                }
-                List<Double> scaledTrainingLabels = minMaxScaleLabels(doubleTrainingLabels);
-                List<Double> doubleTestLabels = new ArrayList<>();
-                for (String str : testLabels) {
-                    doubleTestLabels.add(Double.parseDouble(str));
-                }
-                List<Double> scaledTestLabels = minMaxScaleLabels(doubleTestLabels);
+                // Find min and max of training labels
+                double minLabel = Collections.min(trainingLabels);
+                double maxLabel = Collections.max(trainingLabels);
 
-                List<String> stringScaledTrainingLabels = new ArrayList<>();
-                for (Double d : scaledTrainingLabels) {
-                    stringScaledTrainingLabels.add(String.valueOf(d)); // or d.toString();
-                }
+// Scale the training labels
+                List<Double> scaledTrainingLabels = minMaxScaleLabels(trainingLabels, minLabel, maxLabel);
 
-// Convert to arrays for neural network input
+
+
+                List<Double> testLabels = new ArrayList<>();
+                for (List<Object> row : testData) {
+                    testLabels.add((Double) row.get(row.size() - 1));  // Extract labels for test data
+                }
+                // Scale the test labels using the same min and max from the training labels
+                List<Double> scaledTestLabels = minMaxScaleLabels(testLabels, minLabel, maxLabel);
+                // Convert to arrays for neural network input
                 double[][] trainInputs = new double[scaledTrainingData.size()][];
                 double[][] trainLabels = new double[scaledTrainingLabels.size()][1];
 
@@ -255,28 +259,31 @@ public class AbaloneDriver {
                     trainLabels[t][0] = scaledTrainingLabels.get(t);
                 }
 
-                // Convert test data and labels to arrays
+                // Convert test data and labels to arrays (exclude the last element, which is the label)
                 double[][] testInputs = new double[scaledTestData.size()][];
                 double[][] testLabelsArray = new double[scaledTestLabels.size()][1];
 
                 for (int t = 0; t < scaledTestData.size(); t++) {
-                    testInputs[t] = scaledTestData.get(t).stream().mapToDouble(Double::doubleValue).toArray();
-                    testLabelsArray[t][0] = scaledTestLabels.get(t);
+                    // Exclude the last element (label) from the input data
+                    testInputs[t] = scaledTestData.get(t).subList(0, scaledTestData.get(t).size() - 1)
+                            .stream().mapToDouble(Double::doubleValue).toArray();
+                    testLabelsArray[t][0] = scaledTestLabels.get(t);  // Only use the last element as the label
                 }
+
 
                 // Initialize the neural network for regression
                 int inputSize = trainInputs[0].length;  // Number of features
                 int[] hiddenLayerSizes = {5, 3};  // You can change these as needed
                 int outputSize = 1;  // Regression problem (single continuous output)
                 String activationType = "linear";  // Use linear activation for regression
-                double learningRate = 0.01;
+                double learningRate = 0.0001;
                 boolean useMomentum = false;  // Momentum is optional in regression
-                double momentumCoefficient = 0.0;  // Set to 0 since we aren't using momentum
+                double momentumCoefficient = 0.01;  // Set to 0 since we aren't using momentum
 
                 NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
                 // Train the neural network using the training data
-                int maxEpochs = 1000;  // You can adjust the number of epochs
+                int maxEpochs = 100;  // You can adjust the number of epochs
                 neuralNet.train(trainInputs, trainLabels, maxEpochs);
 
                 // After training, test the neural network on the test data
@@ -308,7 +315,6 @@ public class AbaloneDriver {
         }
     }
 
-    // Method to calculate Mean Squared Error (MSE)
     public static double calculateMSE(List<Double> actual, List<Double> predicted) {
         double sum = 0;
         for (int i = 0; i < actual.size(); i++) {
