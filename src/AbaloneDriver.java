@@ -228,10 +228,10 @@ public class AbaloneDriver {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {5, 3};
+                int[] hiddenLayerSizes = {6, 4};
                 int outputSize = 1;
                 String activationType = "linear";
-                double learningRate = 0.0001;
+                double learningRate = 0.001;
                 boolean useMomentum = false;
                 double momentumCoefficient = 0.01;
 
@@ -244,11 +244,11 @@ public class AbaloneDriver {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
                     double actual = scaledTestData.get(t).get(scaledTestData.get(t).size() - 1);
 
-                    predictedList.add(prediction[0]);
+                    predictedList.add(Math.abs(prediction[0]));
                     actualList.add(actual);
 
                     System.out.printf("Test Instance: %s | Predicted: %.4f | Actual: %.4f%n",
-                            Arrays.toString(testInputs[t]), prediction[0], actual);
+                            Arrays.toString(testInputs[t]), Math.abs(prediction[0]), actual);
                 }
 
                 double mse = calculateMSE(actualList, predictedList);

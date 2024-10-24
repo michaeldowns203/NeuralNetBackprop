@@ -29,29 +29,33 @@ public class NeuralNetwork {
         initializeWeights();
     }
 
-    // Initialize weights randomly between 0 and 1
     private void initializeWeights() {
         Random rand = new Random();
         weights = new ArrayList<>();
         biases = new ArrayList<>();
         deltaWeights = new ArrayList<>();
 
-        // Input to first hidden layer
-        weights.add(new double[inputSize][hiddenLayerSizes[0]]);
-        biases.add(new double[hiddenLayerSizes[0]]);
-        deltaWeights.add(new double[inputSize][hiddenLayerSizes[0]]); // For momentum
+        if (hiddenLayerSizes.length == 0) {
+            // No hidden layers, just connect input to output
+            weights.add(new double[inputSize][outputSize]);
+            biases.add(new double[outputSize]);
+            deltaWeights.add(new double[inputSize][outputSize]);
+        } else {
+            // Same as before: Input to first hidden layer, hidden layers, and output
+            weights.add(new double[inputSize][hiddenLayerSizes[0]]);
+            biases.add(new double[hiddenLayerSizes[0]]);
+            deltaWeights.add(new double[inputSize][hiddenLayerSizes[0]]);
 
-        // Hidden layers
-        for (int i = 1; i < hiddenLayerSizes.length; i++) {
-            weights.add(new double[hiddenLayerSizes[i - 1]][hiddenLayerSizes[i]]);
-            biases.add(new double[hiddenLayerSizes[i]]);
-            deltaWeights.add(new double[hiddenLayerSizes[i - 1]][hiddenLayerSizes[i]]);
+            for (int i = 1; i < hiddenLayerSizes.length; i++) {
+                weights.add(new double[hiddenLayerSizes[i - 1]][hiddenLayerSizes[i]]);
+                biases.add(new double[hiddenLayerSizes[i]]);
+                deltaWeights.add(new double[hiddenLayerSizes[i - 1]][hiddenLayerSizes[i]]);
+            }
+
+            weights.add(new double[hiddenLayerSizes[hiddenLayerSizes.length - 1]][outputSize]);
+            biases.add(new double[outputSize]);
+            deltaWeights.add(new double[hiddenLayerSizes[hiddenLayerSizes.length - 1]][outputSize]);
         }
-
-        // Last hidden layer to output layer
-        weights.add(new double[hiddenLayerSizes[hiddenLayerSizes.length - 1]][outputSize]);
-        biases.add(new double[outputSize]);
-        deltaWeights.add(new double[hiddenLayerSizes[hiddenLayerSizes.length - 1]][outputSize]);
 
         //xaiver initialization
         for (double[][] layerWeights : weights) {
@@ -103,30 +107,54 @@ public class NeuralNetwork {
         // Store the input layer in layerOutputs
         storeLayerOutput(0, currentOutput);
 
-        // Loop through hidden layers
-        for (int i = 0; i < weights.size() - 1; i++) {
-            int previousLayerSize = currentOutput.length;
-            int currentLayerSize = weights.get(i)[0].length; // Number of neurons in the current layer
+        if (hiddenLayerSizes.length == 0) {
+            // Directly go from input to output if no hidden layers
+            double[] finalOutput = new double[outputSize];
+            double[] z = new double[outputSize];
 
-            double[] newOutput = new double[currentLayerSize]; // New output size
-
-            // For each neuron in the current layer
-            for (int j = 0; j < newOutput.length; j++) {
-                double z = 0.0;
-
-                // Sum up the weighted inputs from the previous layer's outputs (currentOutput)
-                for (int k = 0; k < currentOutput.length; k++) {
-                    z += currentOutput[k] * weights.get(i)[k][j]; // Use k for previous layer, j for current layer
+            for (int j = 0; j < outputSize; j++) {
+                z[j] = 0.0;
+                for (int k = 0; k < inputSize; k++) {
+                    z[j] += input[k] * weights.get(0)[k][j]; // Only one weight matrix
                 }
-
-                z += biases.get(i)[j]; // Add the bias term for neuron j in layer i
-                newOutput[j] = sigmoid(z); // Apply sigmoid activation
+                z[j] += biases.get(0)[j];  // Only one bias set
             }
 
-            // Store the output of the current hidden layer
-            storeLayerOutput(i + 1, newOutput);
+            // Apply activation
+            if (activationType.equals("softmax")) {
+                finalOutput = softmax(z);
+            } else {
+                finalOutput = z;  // For linear activation or regression
+            }
 
-            currentOutput = newOutput; // Update currentOutput to the new layer's output
+            return finalOutput;
+        } else {
+
+            // Loop through hidden layers
+            for (int i = 0; i < weights.size() - 1; i++) {
+                int previousLayerSize = currentOutput.length;
+                int currentLayerSize = weights.get(i)[0].length; // Number of neurons in the current layer
+
+                double[] newOutput = new double[currentLayerSize]; // New output size
+
+                // For each neuron in the current layer
+                for (int j = 0; j < newOutput.length; j++) {
+                    double z = 0.0;
+
+                    // Sum up the weighted inputs from the previous layer's outputs (currentOutput)
+                    for (int k = 0; k < currentOutput.length; k++) {
+                        z += currentOutput[k] * weights.get(i)[k][j]; // Use k for previous layer, j for current layer
+                    }
+
+                    z += biases.get(i)[j]; // Add the bias term for neuron j in layer i
+                    newOutput[j] = sigmoid(z); // Apply sigmoid activation
+                }
+
+                // Store the output of the current hidden layer
+                storeLayerOutput(i + 1, newOutput);
+
+                currentOutput = newOutput; // Update currentOutput to the new layer's output
+            }
         }
 
         // Output layer activation (softmax or linear)
@@ -161,6 +189,7 @@ public class NeuralNetwork {
 
     // Backpropagation
     public void backPropagation(double[] actualOutput, double[] predictedOutput) {
+
         double[] error = new double[predictedOutput.length];
 
         if (activationType.equals("softmax")) {
@@ -174,53 +203,50 @@ public class NeuralNetwork {
                 error[i] = (predictedOutput[i] - actualOutput[i]) * 2;
             }
         }
+        // No hidden layers, update directly
+        if (hiddenLayerSizes.length == 0) {
+            updateWeights(0, error);
+        } else {
 
-        // Update weights for the output layer
-        int lastLayerIdx = weights.size() - 1;
-        double[] delta = error.clone();
+            // Update weights for the output layer
+            int lastLayerIdx = weights.size() - 1;
+            double[] delta = error.clone();
 
-        // Apply gradient clipping
-        clipGradients(delta, 5.0); // Clipping value of 5.0, you can adjust this
+            // Apply gradient clipping
+            //clipGradients(delta, 1.0); // Clipping value of 5.0, you can adjust this
 
-        // Update weights for the output layer
-        updateWeights(lastLayerIdx, delta);
+            // Update weights for the output layer
+            updateWeights(lastLayerIdx, delta);
 
-        // Backpropagate through hidden layers
-        for (int layerIdx = lastLayerIdx - 1; layerIdx >= 0; layerIdx--) {
-            double[] newDelta = new double[weights.get(layerIdx)[0].length];
-            for (int i = 0; i < weights.get(layerIdx)[0].length; i++) {
-                double gradient = 0;
-                for (int j = 0; j < delta.length; j++) {
-                    gradient += weights.get(layerIdx + 1)[i][j] * delta[j];
+            // Backpropagate through hidden layers
+            for (int layerIdx = lastLayerIdx - 1; layerIdx >= 0; layerIdx--) {
+                double[] newDelta = new double[weights.get(layerIdx)[0].length];
+                for (int i = 0; i < weights.get(layerIdx)[0].length; i++) {
+                    double gradient = 0;
+                    for (int j = 0; j < delta.length; j++) {
+                        gradient += weights.get(layerIdx + 1)[i][j] * delta[j];
+                    }
+                    double sigmoidDerivative = sigmoid(biases.get(layerIdx)[i]) * (1 - sigmoid(biases.get(layerIdx)[i]));
+                    newDelta[i] = gradient * sigmoidDerivative;
                 }
-                double sigmoidDerivative = sigmoid(biases.get(layerIdx)[i]) * (1 - sigmoid(biases.get(layerIdx)[i]));
-                newDelta[i] = gradient * sigmoidDerivative;
+
+                // Apply gradient clipping for the current layer's delta
+                //clipGradients(newDelta, 10);  // Again, clipping value of 5.0
+
+                delta = newDelta;
+                updateWeights(layerIdx, delta);
             }
-
-            // Apply gradient clipping for the current layer's delta
-            //clipGradients(newDelta, 10);  // Again, clipping value of 5.0
-
-            delta = newDelta;
-            updateWeights(layerIdx, delta);
         }
     }
 
 
     private void updateWeights(int layerIdx, double[] delta) {
         double[][] weightMatrix = weights.get(layerIdx);
-
-        // Use inputLayer for the first layer, and layerOutputs for the others
-        double[] inputLayerForWeights = (layerIdx == 0) ? inputLayer : outputLayer(layerIdx - 1); // Get inputs from inputLayer or previous layer
-
+        double[] inputLayerForWeights = (layerIdx == 0) ? inputLayer : outputLayer(layerIdx - 1);
 
         for (int i = 0; i < weightMatrix.length; i++) {
-            // Update biases similarly to weights
-            for (int j = 0; j < biases.get(layerIdx).length; j++) {
-                biases.get(layerIdx)[j] += -learningRate * delta[j];
-            }
-
             for (int j = 0; j < weightMatrix[i].length; j++) {
-                double gradient = delta[j] * inputLayerForWeights[i]; // Correct input source for the current layer
+                double gradient = delta[j] * inputLayerForWeights[i];
                 double deltaW = -learningRate * gradient;
 
                 if (useMomentum) {
@@ -230,8 +256,14 @@ public class NeuralNetwork {
 
                 weightMatrix[i][j] += deltaW;
             }
+
+            // Update biases
+            for (int j = 0; j < biases.get(layerIdx).length; j++) {
+                biases.get(layerIdx)[j] += -learningRate * delta[j];
+            }
         }
     }
+
 
 
     // Sigmoid derivative for backpropagation
