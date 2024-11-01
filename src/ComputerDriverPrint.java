@@ -1,67 +1,43 @@
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.*;
+import java.io.*;
 
-//normal 10 fold
-public class ForestDriver2 {
+//test model - normal 10 fold
+public class ComputerDriverPrint {
 
     public static void main(String[] args) throws IOException {
-        String inputFile1 = "src/forestfires.data";
+        String inputFile1 = "src/machine.data";
         try {
             FileInputStream fis = new FileInputStream(inputFile1);
             InputStreamReader isr = new InputStreamReader(fis);
             BufferedReader stdin = new BufferedReader(isr);
 
-            // First, count the number of lines to determine the size of the lists
             int lineCount = 0;
             while (stdin.readLine() != null) {
                 lineCount++;
             }
-            // Reset the reader to the beginning of the file
+
             stdin.close();
             fis = new FileInputStream(inputFile1);
             isr = new InputStreamReader(fis);
             stdin = new BufferedReader(isr);
 
-            // Initialize the lists
             List<List<Object>> dataset = new ArrayList<>();
-            List<Object> labels = new ArrayList<>();
-
             String line;
-            //instance variable; flag to skip the first line
-            boolean firstLine = true;
-            int lineNum = 0;
 
-            // Read the file and fill the dataset
             while ((line = stdin.readLine()) != null) {
-                //skips the first line as it includes headers not data
-                if (firstLine) {
-                    firstLine = false;
-                    continue;
-                }
                 String[] rawData = line.split(",");
                 List<Object> row = new ArrayList<>();
-
-                // Assign the label (last column)
-                labels.add(Double.parseDouble(rawData[12]));
-
-                // Fill the data row
-                for (int i = 0; i < 7; i++) {
-                    row.add(Double.parseDouble(rawData[i + 4]));
+                for (int i = 2; i <= 8; i++) {
+                    row.add(Double.parseDouble(rawData[i]));
                 }
-                row.add(labels.get(lineNum)); // Add the label to the row
                 dataset.add(row);
-                lineNum++;
             }
 
             stdin.close();
 
-            // Split the remaining dataset into stratified chunks
+            //List<List<Object>> testSet = extractTenPercent(dataset);
             List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksR(dataset, 10);
 
-            // Loss instance variables
             double totalMSE = 0;
 
             for (int i = 0; i < 10; i++) {
@@ -116,17 +92,20 @@ public class ForestDriver2 {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {6,4};
+                int[] hiddenLayerSizes = {6, 4};
                 int outputSize = 1;
                 String activationType = "linear";
                 double learningRate = 0.001;
-                boolean useMomentum = false;
-                double momentumCoefficient = 0.01;
+                boolean useMomentum = true;
+                double momentumCoefficient = 0.5;
 
-                NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
+                NeuralNetworkPrint neuralNet = new NeuralNetworkPrint(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
-                int maxEpochs = 100;
+                int maxEpochs = 1000;
                 neuralNet.train(trainInputs, trainOutputs, maxEpochs);
+
+                neuralNet.printWeightsAndInputs();
+                neuralNet.printActivations();
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
@@ -152,6 +131,3 @@ public class ForestDriver2 {
         }
     }
 }
-
-
-

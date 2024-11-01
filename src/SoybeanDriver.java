@@ -7,121 +7,6 @@ import java.util.*;
 //10% cross validation for tuning
 public class SoybeanDriver {
 
-    // Method to scale labels using Min-Max Scaling
-    public static List<Double> minMaxScaleLabels(List<Double> labels) {
-        // Scale the labels using Min-Max scaling
-        double minLabel = Collections.min(labels);
-        double maxLabel = Collections.max(labels);
-        List<Double> scaledLabels = new ArrayList<>();
-        for (double label : labels) {
-            double scaledLabel = (label - minLabel) / (maxLabel - minLabel);
-            scaledLabels.add(scaledLabel);
-        }
-
-        return scaledLabels;  // Return the scaled labels
-    }
-
-
-    // Method to scale features using Min-Max Scaling
-    public static List<List<Double>> minMaxScale(List<List<Double>> data) {
-        int numFeatures = data.get(0).size();  // Process all columns as features
-        List<Double> minValues = new ArrayList<>(Collections.nCopies(numFeatures, Double.MAX_VALUE));
-        List<Double> maxValues = new ArrayList<>(Collections.nCopies(numFeatures, Double.MIN_VALUE));
-
-        // Find the min and max values for each feature
-        for (List<Double> row : data) {
-            for (int i = 0; i < numFeatures; i++) {
-                double value = row.get(i);
-                if (value < minValues.get(i)) minValues.set(i, value);
-                if (value > maxValues.get(i)) maxValues.set(i, value);
-            }
-        }
-
-        // Scale the dataset based on min and max values
-        List<List<Double>> scaledData = new ArrayList<>();
-        for (List<Double> row : data) {
-            List<Double> scaledRow = new ArrayList<>();
-            for (int i = 0; i < numFeatures; i++) {
-                double value = row.get(i);
-                double scaledValue = (value - minValues.get(i)) / (maxValues.get(i) - minValues.get(i));
-                scaledRow.add(scaledValue);
-            }
-            scaledData.add(scaledRow);  // Only include scaled features
-        }
-
-        return scaledData;
-    }
-    public static List<List<Object>> extractTenPercent(List<List<Object>> dataset) {
-        // Create a map to hold instances of each class
-        Map<String, List<List<Object>>> classMap = new HashMap<>();
-
-        // Populate the class map
-        for (List<Object> row : dataset) {
-            String label = row.get(row.size() - 1).toString();
-            classMap.putIfAbsent(label, new ArrayList<>());
-            classMap.get(label).add(row);
-        }
-
-        List<List<Object>> removedInstances = new ArrayList<>();
-
-        // Extract 10% of instances while maintaining class proportions
-        for (List<List<Object>> classInstances : classMap.values()) {
-            Random random = new Random(123);
-            Collections.shuffle(classInstances, random); // Shuffle instances within each class
-
-            // Determine the number of instances to remove (10%)
-            int numToRemove = (int) (classInstances.size() * 0.1);
-
-            // Extract the instances and add them to the removed list
-            removedInstances.addAll(classInstances.subList(0, numToRemove));
-
-            // Retain the remaining instances in the class instances list
-            classInstances.subList(0, numToRemove).clear(); // Remove the extracted instances
-        }
-
-        return removedInstances;
-    }
-
-    public static List<List<List<Object>>> splitIntoStratifiedChunks(List<List<Object>> dataset, int numChunks) {
-        // Extract 10% of the dataset
-        List<List<Object>> removedInstances = extractTenPercent(dataset);
-
-        // Create a map to hold instances of each class
-        Map<String, List<List<Object>>> classMap = new HashMap<>();
-
-        // Populate the class map with the remaining instances
-        for (List<Object> row : dataset) {
-            String label = row.get(row.size() - 1).toString();
-            classMap.putIfAbsent(label, new ArrayList<>());
-            classMap.get(label).add(row);
-        }
-
-        // Create chunks for stratified sampling
-        List<List<List<Object>>> chunks = new ArrayList<>();
-        for (int i = 0; i < numChunks; i++) {
-            chunks.add(new ArrayList<>());
-        }
-
-        // Distribute remaining instances into chunks while maintaining class proportions
-        for (List<List<Object>> classInstances : classMap.values()) {
-            Random random = new Random(123);
-            Collections.shuffle(classInstances, random); // Shuffle instances within each class
-
-            // Calculate the chunk size for remaining instances
-            int chunkSize = classInstances.size() / numChunks;
-
-            // Distribute the remaining instances into chunks
-            for (int i = 0; i < numChunks; i++) {
-                int start = i * chunkSize;
-                int end = (i == numChunks - 1) ? classInstances.size() : start + chunkSize;
-                chunks.get(i).addAll(classInstances.subList(start, end));
-            }
-        }
-
-        return chunks;
-    }
-
-
     public static void main(String[] args) throws IOException {
         String inputFile1 = "src/soybean-small.data";
         try {
@@ -153,7 +38,9 @@ public class SoybeanDriver {
                 List<Object> row = new ArrayList<>();
 
                 // Assign the label (last column)
-                labels.add(rawData[35]);
+                String label = rawData[35];
+                String numLabel = label.replaceAll("[^0-9.]", "");
+                labels.add(Double.parseDouble(numLabel));
 
                 // Fill the data rows
                 for (int i = 0; i < rawData.length - 1; i++) {
@@ -169,99 +56,181 @@ public class SoybeanDriver {
             stdin.close();
 
             // Extract 10% of the dataset for testing
-            List<List<Object>> testSet = extractTenPercent(dataset);
+            List<List<Object>> testSet = TenFoldCrossValidation.extractTenPercentC(dataset);
 
             // Split the remaining dataset into stratified chunks
-            List<List<List<Object>>> chunks = splitIntoStratifiedChunks(dataset, 10);
+            List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksC10(dataset, 10);
 
-            // Initialize the NeuralNetwork
-            int inputSize = 9;  // Number of input features (columns 2 to 10 in the dataset)
-            int[] hiddenLayerSizes = {5, 3};  // Example: 2 hidden layers, with 5 and 3 neurons respectively
-            int outputSize = 1;  // Single output for classification (e.g., binary or multi-class)
-            String activationType = "softmax";  // Use softmax for classification
-            double learningRate = 0.01;  // Learning rate for gradient descent
-            boolean useMomentum = false;  // Disable momentum in this example
-            double momentumCoefficient = 0.0;  // Momentum coefficient (irrelevant if useMomentum is false)
+            // Loss instance variables
+            double totalAccuracy = 0;
+            double totalPrecision = 0;
+            double totalRecall = 0;
+            double totalF1 = 0;
+            double total01loss = 0;
 
-            NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
-
-            // Convert dataset to neural network input format
-            double[][] trainInputs;
-            double[][] trainLabels;
-            double[][] testInputs;
-            double[][] testLabels;
-
-            // Perform stratified 10-fold cross-validation
             for (int i = 0; i < 10; i++) {
-                // Prepare training data
+                List<List<Object>> trainingSet = new ArrayList<>();
                 List<List<Double>> trainingData = new ArrayList<>();
-                List<Integer> trainingLabels = new ArrayList<>();
+                List<List<Double>> trainingLabels = new ArrayList<>();
+                List<Integer> predictedList = new ArrayList<>();
+                List<Integer> actualList = new ArrayList<>();
 
-                // Combine the other 9 chunks into the training set
+                int correctPredictions = 0;
+                int truePositives = 0;
+                int falsePositives = 0;
+                int falseNegatives = 0;
+
+
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            trainingLabels.add((Integer) row.get(row.size() - 1));  // Last column is label
-                            List<Double> features = new ArrayList<>();
-                            for (int k = 0; k < row.size() - 1; k++) {
-                                features.add((Double) row.get(k));
+                            List<Object> all = new ArrayList<>();
+                            for (int k = 0; k < row.size(); k++) {
+                                all.add((Double) row.get(k));
                             }
-                            trainingData.add(features);
+                            trainingSet.add(all);
                         }
                     }
                 }
 
-                // Convert training data and labels to arrays
-                trainInputs = new double[trainingData.size()][inputSize];
-                trainLabels = new double[trainingData.size()][1]; // Assuming single output per example
+                List<List<Double>> scaledTrainingData = MinMaxScale.minMaxScale(trainingSet);
+                List<List<Double>> scaledTestData = MinMaxScale.minMaxScale(testSet);
+
+                // Loop through the scaledTrainingData to extract features and labels
+                for (int j = 0; j < scaledTrainingData.size(); j++) {
+                    if (j != i) { // If excluding a specific chunk (e.g., for cross-validation)
+                        List<Double> row = scaledTrainingData.get(j);
+                        List<Double> features = new ArrayList<>(row.subList(0, row.size() - 1)); // All but the last element
+                        Double label = row.get(row.size() - 1); // The last element as the label
+
+                        trainingData.add(features); // Add features to trainingData
+                        trainingLabels.add(Collections.singletonList(label)); // Add label to trainingLabels
+                    }
+                }
+
+                double[][] trainInputs = new double[trainingData.size()][];
+                double[][] trainOutputs = new double[trainingLabels.size()][];
 
                 for (int t = 0; t < trainingData.size(); t++) {
                     trainInputs[t] = trainingData.get(t).stream().mapToDouble(Double::doubleValue).toArray();
-                    trainLabels[t][0] = trainingLabels.get(t);
+                    trainOutputs[t] = trainingLabels.get(t).stream().mapToDouble(Double::doubleValue).toArray();
                 }
 
-                // Train the neural network
-                neuralNet.train(trainInputs, trainLabels, 1000);  // Train for 1000 epochs
+                double[][] trainOutputsOHE = OneHotEncoder.oneHotEncode(trainOutputs);
 
-                // Prepare test data for the current fold
-                List<List<Double>> testData = new ArrayList<>();
-                List<Integer> testLabelsList = new ArrayList<>();
-
-                for (List<Object> row : testSet) {
-                    testLabelsList.add((Integer) row.get(row.size() - 1)); // Last column is label
-                    List<Double> features = new ArrayList<>();
-                    for (int k = 0; k < row.size() - 1; k++) {
-                        features.add((Double) row.get(k));
-                    }
-                    testData.add(features);
+                double[][] testInputs = new double[scaledTestData.size()][];
+                for (int t = 0; t < scaledTestData.size(); t++) {
+                    testInputs[t] = scaledTestData.get(t).subList(0, scaledTestData.get(t).size() - 1)
+                            .stream().mapToDouble(Double::doubleValue).toArray();
                 }
 
-                // Convert test data and labels to arrays
-                testInputs = new double[testData.size()][inputSize];
-                testLabels = new double[testLabelsList.size()][1];
+                int inputSize = trainInputs[0].length;
+                int[] hiddenLayerSizes = {5,2};
+                int outputSize = 4;
+                String activationType = "softmax";
+                double learningRate = 0.1;
+                boolean useMomentum = false;
+                double momentumCoefficient = 0.01;
 
-                for (int t = 0; t < testData.size(); t++) {
-                    testInputs[t] = testData.get(t).stream().mapToDouble(Double::doubleValue).toArray();
-                    testLabels[t][0] = testLabelsList.get(t);
-                }
+                NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
-                // Test the neural network
-                int correctPredictions = 0;
+                int maxEpochs = 1000;
+                neuralNet.train(trainInputs, trainOutputsOHE, maxEpochs);
+
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
+                    double actual = scaledTestData.get(t).get(scaledTestData.get(t).size() - 1);
+                    int actualClass = 0;
 
-                    // Convert prediction (softmax might return probabilities) to label
-                    int predictedLabel = (prediction[0] >= 0.5) ? 1 : 0; // Adjust this based on your actual classification
+                    if (actual == 0.0)
+                        actualClass = 1;
+                    else if (actual == 0.25)
+                        actualClass = 2;
+                    else if (actual == 0.5)
+                        actualClass = 3;
+                    else
+                        actualClass = 4;
 
-                    if (predictedLabel == (int) testLabels[t][0]) {
+                    double maxProb = prediction[0];
+                    int maxIndex = 0;
+
+                    for (int g = 1; g < prediction.length; g++) {
+                        if (prediction[g] > maxProb) {
+                            maxProb = prediction[g];
+                            maxIndex = g;
+                        }
+                    }
+
+                    if (maxIndex == 0)
+                        predictedList.add(1);
+                    else if (maxIndex == 1)
+                        predictedList.add(2);
+                    else if (maxIndex == 2)
+                        predictedList.add(3);
+                    else
+                        predictedList.add(4);
+
+                    actualList.add(actualClass);
+
+                    System.out.printf("Test Instance: %s | Predicted: %d | Actual: %d%n",
+                            Arrays.toString(testInputs[t]), predictedList.get(t), actualClass);
+
+
+                    if (predictedList.get(t).equals(actualClass)) {
                         correctPredictions++;
+                    }
+
+                    // Get true positives, false positives, and false negatives
+                    if (predictedList.get(t) == 1) {
+                        if (actualClass == 1) {
+                            truePositives++;
+                        } else {
+                            falsePositives++;
+                        }
+                    } else if (actualClass == 1) {
+                        falseNegatives++;
                     }
                 }
 
-                // Calculate accuracy
+                // Calculate precision and recall
+                double precision = truePositives / (double) (truePositives + falsePositives);
+                double recall = truePositives / (double) (truePositives + falseNegatives);
+                totalPrecision += precision;
+                totalRecall += recall;
+
+                double f1Score = 2 * (precision * recall) / (precision + recall);
+                totalF1 += f1Score;
+
+                // Calculate accuracy for this fold
                 double accuracy = (double) correctPredictions / testSet.size();
+                totalAccuracy += accuracy;
+
+                // Calculate 0/1 loss
+                double loss01 = 1.0 - (double) correctPredictions / testSet.size();
+                total01loss += loss01;
+
+                // Print loss info
+                System.out.println("Number of correct predictions: " + correctPredictions);
+                System.out.println("Number of test instances: " + testSet.size());
                 System.out.println("Fold " + (i + 1) + " Accuracy: " + accuracy);
+                System.out.println("Fold " + (i + 1) + " 0/1 loss: " + loss01);
+                System.out.println("Precision for class D1 (hold-out fold " + (i + 1) + "): " + precision);
+                System.out.println("Recall for class D1 (hold-out fold " + (i + 1) + "): " + recall);
+                System.out.println("F1 Score for class D1 (hold-out fold " + (i + 1) + "): " + f1Score);
             }
+
+            // Average accuracy across all 10 folds
+            double averageAccuracy = totalAccuracy / 10;
+            double average01loss = total01loss / 10;
+            double averagePrecision = totalPrecision / 10;
+            double averageRecall = totalRecall / 10;
+            double averageF1 = totalF1 / 10;
+            System.out.println("Average Accuracy: " + averageAccuracy);
+            System.out.println("Average 0/1 Loss: " + average01loss);
+            System.out.println("Average Precision for class D1: " + averagePrecision);
+            System.out.println("Average Recall for class D1: " + averageRecall);
+            System.out.println("Average F1 for class D1: " + averageF1);
+
         } catch (IOException e) {
             e.printStackTrace();
         }

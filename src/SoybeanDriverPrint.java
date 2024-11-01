@@ -4,11 +4,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
 
-//normal 10 fold
-public class GlassDriver2 {
+//test model - normal 10 fold
+public class SoybeanDriverPrint {
 
     public static void main(String[] args) throws IOException {
-        String inputFile1 = "src/glass.data";
+        String inputFile1 = "src/soybean-small.data";
         try {
             FileInputStream fis = new FileInputStream(inputFile1);
             InputStreamReader isr = new InputStreamReader(fis);
@@ -19,7 +19,6 @@ public class GlassDriver2 {
             while (stdin.readLine() != null) {
                 lineCount++;
             }
-
             // Reset the reader to the beginning of the file
             stdin.close();
             fis = new FileInputStream(inputFile1);
@@ -39,10 +38,12 @@ public class GlassDriver2 {
                 List<Object> row = new ArrayList<>();
 
                 // Assign the label (last column)
-                labels.add(Double.parseDouble(rawData[10]));
+                String label = rawData[35];
+                String numLabel = label.replaceAll("[^0-9.]", "");
+                labels.add(Double.parseDouble(numLabel));
 
-                // Fill the data row (columns 2 to 10)
-                for (int i = 1; i < rawData.length - 1; i++) {
+                // Fill the data rows
+                for (int i = 0; i < rawData.length - 1; i++) {
                     row.add(Double.parseDouble(rawData[i]));
                 }
                 row.add(labels.get(lineNum)); // Add the label to the row
@@ -121,17 +122,19 @@ public class GlassDriver2 {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {};
-                int outputSize = 6;
+                int[] hiddenLayerSizes = {5,2};
+                int outputSize = 4;
                 String activationType = "softmax";
                 double learningRate = 0.00001;
                 boolean useMomentum = false;
                 double momentumCoefficient = 0.01;
 
-                NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
+                NeuralNetworkPrint neuralNet = new NeuralNetworkPrint(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
                 int maxEpochs = 1000;
                 neuralNet.train(trainInputs, trainOutputsOHE, maxEpochs);
+
+                neuralNet.printWeightsAndInputs();
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
@@ -140,16 +143,12 @@ public class GlassDriver2 {
 
                     if (actual == 0.0)
                         actualClass = 1;
-                    else if (actual < 0.2)
+                    else if (actual == 0.25)
                         actualClass = 2;
-                    else if (actual < 0.4)
+                    else if (actual == 0.5)
                         actualClass = 3;
-                    else if (actual < 0.6)
-                        actualClass = 5;
-                    else if (actual < 0.8)
-                        actualClass = 6;
                     else
-                        actualClass = 7;
+                        actualClass = 4;
 
                     double maxProb = prediction[0];
                     int maxIndex = 0;
@@ -167,12 +166,8 @@ public class GlassDriver2 {
                         predictedList.add(2);
                     else if (maxIndex == 2)
                         predictedList.add(3);
-                    else if (maxIndex == 3)
-                        predictedList.add(5);
-                    else if (maxIndex == 4)
-                        predictedList.add(6);
                     else
-                        predictedList.add(7);
+                        predictedList.add(4);
 
                     actualList.add(actualClass);
 
@@ -180,7 +175,7 @@ public class GlassDriver2 {
                             Arrays.toString(testInputs[t]), predictedList.get(t), actualClass);
 
 
-                    if (predictedList.get(t) == actualClass) {
+                    if (predictedList.get(t).equals(actualClass)) {
                         correctPredictions++;
                     }
 
@@ -218,9 +213,9 @@ public class GlassDriver2 {
                 System.out.println("Number of test instances: " + testSet.size());
                 System.out.println("Fold " + (i + 1) + " Accuracy: " + accuracy);
                 System.out.println("Fold " + (i + 1) + " 0/1 loss: " + loss01);
-                System.out.println("Precision for class building windows float processed (1) (hold-out fold " + (i + 1) + "): " + precision);
-                System.out.println("Recall for class building windows float processed (1) (hold-out fold " + (i + 1) + "): " + recall);
-                System.out.println("F1 Score for class building windows float processed (1) (hold-out fold " + (i + 1) + "): " + f1Score);
+                System.out.println("Precision for class D1 (hold-out fold " + (i + 1) + "): " + precision);
+                System.out.println("Recall for class D1 (hold-out fold " + (i + 1) + "): " + recall);
+                System.out.println("F1 Score for class D1 (hold-out fold " + (i + 1) + "): " + f1Score);
             }
 
             // Average accuracy across all 10 folds
@@ -231,13 +226,12 @@ public class GlassDriver2 {
             double averageF1 = totalF1 / 10;
             System.out.println("Average Accuracy: " + averageAccuracy);
             System.out.println("Average 0/1 Loss: " + average01loss);
-            System.out.println("Average Precision for class building windows float processed (1): " + averagePrecision);
-            System.out.println("Average Recall for class building windows float processed (1): " + averageRecall);
-            System.out.println("Average F1 for class building windows float processed (1): " + averageF1);
+            System.out.println("Average Precision for class D1: " + averagePrecision);
+            System.out.println("Average Recall for class D1: " + averageRecall);
+            System.out.println("Average F1 for class D1: " + averageF1);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
 }

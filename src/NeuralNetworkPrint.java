@@ -3,7 +3,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-public class NeuralNetwork {
+public class NeuralNetworkPrint {
     private int inputSize;
     private int[] hiddenLayerSizes;
     private int outputSize;
@@ -16,7 +16,7 @@ public class NeuralNetwork {
     private List<double[]> biases;
     private List<double[][]> deltaWeights;
 
-    public NeuralNetwork(int inputSize, int[] hiddenLayerSizes, int outputSize, String activationType,
+    public NeuralNetworkPrint(int inputSize, int[] hiddenLayerSizes, int outputSize, String activationType,
                          double learningRate, boolean useMomentum, double momentumCoefficient) {
         this.inputSize = inputSize;
         this.hiddenLayerSizes = hiddenLayerSizes;
@@ -205,9 +205,17 @@ public class NeuralNetwork {
         } else {
             // Mean Squared Error for Regression
             for (int i = 0; i < predictedOutput.length; i++) {
-                error[i] = (predictedOutput[i] - actualOutput[i]);
+                error[i] = 2 * (predictedOutput[i] - actualOutput[i]);
             }
         }
+
+        /*
+        // Print gradient information for the output layer
+        System.out.println("Gradient at the Output Layer:");
+        for (int i = 0; i < error.length; i++) {
+            System.out.printf("Output Neuron %d: %.4f\n", i + 1, error[i]);
+        }
+        */
 
         // No hidden layers, update directly
         if (hiddenLayerSizes.length == 0) {
@@ -236,9 +244,6 @@ public class NeuralNetwork {
                     newDelta[i] = gradient * sigmoidDerivative;
                 }
 
-                // Apply gradient clipping for the current layer's delta if necessary
-                //clipGradients(newDelta, 1.0); // Adjust the clipping value as needed
-
                 delta = newDelta;
                 updateWeights(layerIdx, delta);
             }
@@ -249,27 +254,41 @@ public class NeuralNetwork {
         double[][] weightMatrix = weights.get(layerIdx);
         double[] inputLayerForWeights = (layerIdx == 0) ? inputLayer : outputLayer(layerIdx - 1);
 
+        //System.out.println("Weight updates for Layer " + (layerIdx + 1) + ":");
+
         for (int i = 0; i < weightMatrix.length; i++) {
             for (int j = 0; j < weightMatrix[i].length; j++) {
                 double gradient = delta[j] * inputLayerForWeights[i];
                 double deltaW = -learningRate * gradient;
 
+                // Apply momentum if enabled
                 if (useMomentum) {
                     deltaW += momentumCoefficient * deltaWeights.get(layerIdx)[i][j];
                     deltaWeights.get(layerIdx)[i][j] = deltaW;
                 }
 
+                // Print the weight update details
+                //System.out.printf("Weight[%d][%d] before update: %.4f, Gradient: %8.4f, Update: %8.4f\n",
+                //        i, j, weightMatrix[i][j], gradient, deltaW);
+
+                // Update the weight
                 weightMatrix[i][j] += deltaW;
+
+                // Print the updated weight
+                //System.out.printf("Weight[%d][%d] after update: %.4f\n", i, j, weightMatrix[i][j]);
             }
 
             // Update biases
             for (int j = 0; j < biases.get(layerIdx).length; j++) {
-                biases.get(layerIdx)[j] += -learningRate * delta[j];
+                double biasUpdate = -learningRate * delta[j];
+                //System.out.printf("Bias[%d] before update: %8.4f, Update: %.4f\n", j, biases.get(layerIdx)[j], biasUpdate);
+                biases.get(layerIdx)[j] += biasUpdate;
+                //System.out.printf("Bias[%d] after update: %.4f\n", j, biases.get(layerIdx)[j]);
             }
         }
+
+        System.out.println();
     }
-
-
 
     // Sigmoid derivative for backpropagation
     private double sigmoidDerivative(double z) {
@@ -328,5 +347,57 @@ public class NeuralNetwork {
             }
         }
     }
+
+    public void printWeightsAndInputs() {
+        for (int layerIdx = 0; layerIdx < weights.size(); layerIdx++) {
+            double[][] weightMatrix = weights.get(layerIdx);
+
+            System.out.println("Layer " + (layerIdx + 1) + " (Input size: " + weightMatrix.length + ", Output size: " + weightMatrix[0].length + "):");
+
+            // Print inputs to the current layer
+            if (layerIdx == 0) {
+                System.out.print("Inputs to Layer 1: ");
+                double[] inputToFirstLayer = getInputLayer();
+                for (double input : inputToFirstLayer) {
+                    System.out.printf("%8.4f ", input);
+                }
+                System.out.println();
+                System.out.println("Outputs for:");
+            } else {
+                System.out.print("Inputs to Layer " + (layerIdx + 1) + ": ");
+                double[] inputToLayer = layerOutputs.get(layerIdx);
+                for (double input : inputToLayer) {
+                    System.out.printf("%8.4f ", input);
+                }
+                System.out.println();
+                System.out.println("Outputs for:");
+            }
+
+            // Print weights for the current layer
+            for (int i = 0; i < weightMatrix.length; i++) {
+                System.out.print("Input " + (i + 1) + ": ");
+                for (int j = 0; j < weightMatrix[i].length; j++) {
+                    System.out.printf("%8.4f ", weightMatrix[i][j]);
+                }
+                System.out.println();
+            }
+
+            System.out.println();
+        }
+    }
+
+    public void printActivations() {
+        for (int layerIdx = 0; layerIdx < layerOutputs.size(); layerIdx++) {
+            double[] activations = layerOutputs.get(layerIdx);
+            System.out.println("Activations at Layer " + (layerIdx + 1) + ":");
+            for (int i = 0; i < activations.length; i++) {
+                System.out.printf("Neuron %d: %.4f%n", i + 1, activations[i]);
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
+
+
 
 }
