@@ -51,8 +51,6 @@ public class SoybeanDriver {
                 lineNum++;
             }
 
-            System.out.println(dataset.size());
-
             stdin.close();
 
             // Extract 10% of the dataset for testing
@@ -62,11 +60,8 @@ public class SoybeanDriver {
             List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksC10(dataset, 10);
 
             // Loss instance variables
-            double totalAccuracy = 0;
-            double totalPrecision = 0;
-            double totalRecall = 0;
-            double totalF1 = 0;
             double total01loss = 0;
+            double totalACR= 0;
 
             for (int i = 0; i < 10; i++) {
                 List<List<Object>> trainingSet = new ArrayList<>();
@@ -76,9 +71,6 @@ public class SoybeanDriver {
                 List<Integer> actualList = new ArrayList<>();
 
                 int correctPredictions = 0;
-                int truePositives = 0;
-                int falsePositives = 0;
-                int falseNegatives = 0;
 
 
                 for (int j = 0; j < 10; j++) {
@@ -125,17 +117,18 @@ public class SoybeanDriver {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {5,2};
+                int[] hiddenLayerSizes = {5,3};
                 int outputSize = 4;
                 String activationType = "softmax";
-                double learningRate = 0.1;
-                boolean useMomentum = false;
-                double momentumCoefficient = 0.01;
+                double learningRate = 0.001;
+                boolean useMomentum = true;
+                double momentumCoefficient = 0.9;
 
                 NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
                 int maxEpochs = 1000;
-                neuralNet.train(trainInputs, trainOutputsOHE, maxEpochs);
+                double tolerance = 0.0001;
+                neuralNet.train(trainInputs, trainOutputsOHE, tolerance, maxEpochs);
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
@@ -144,9 +137,9 @@ public class SoybeanDriver {
 
                     if (actual == 0.0)
                         actualClass = 1;
-                    else if (actual == 0.25)
+                    else if (actual < 0.4)
                         actualClass = 2;
-                    else if (actual == 0.5)
+                    else if (actual < 0.8)
                         actualClass = 3;
                     else
                         actualClass = 4;
@@ -179,59 +172,24 @@ public class SoybeanDriver {
                     if (predictedList.get(t).equals(actualClass)) {
                         correctPredictions++;
                     }
-
-                    // Get true positives, false positives, and false negatives
-                    if (predictedList.get(t) == 1) {
-                        if (actualClass == 1) {
-                            truePositives++;
-                        } else {
-                            falsePositives++;
-                        }
-                    } else if (actualClass == 1) {
-                        falseNegatives++;
-                    }
                 }
-
-                // Calculate precision and recall
-                double precision = truePositives / (double) (truePositives + falsePositives);
-                double recall = truePositives / (double) (truePositives + falseNegatives);
-                totalPrecision += precision;
-                totalRecall += recall;
-
-                double f1Score = 2 * (precision * recall) / (precision + recall);
-                totalF1 += f1Score;
-
-                // Calculate accuracy for this fold
-                double accuracy = (double) correctPredictions / testSet.size();
-                totalAccuracy += accuracy;
 
                 // Calculate 0/1 loss
                 double loss01 = 1.0 - (double) correctPredictions / testSet.size();
                 total01loss += loss01;
+                System.out.printf("Fold %d 0/1 loss: %.4f%n", i+1, loss01);
 
-                // Print loss info
-                System.out.println("Number of correct predictions: " + correctPredictions);
-                System.out.println("Number of test instances: " + testSet.size());
-                System.out.println("Fold " + (i + 1) + " Accuracy: " + accuracy);
-                System.out.println("Fold " + (i + 1) + " 0/1 loss: " + loss01);
-                System.out.println("Precision for class D1 (hold-out fold " + (i + 1) + "): " + precision);
-                System.out.println("Recall for class D1 (hold-out fold " + (i + 1) + "): " + recall);
-                System.out.println("F1 Score for class D1 (hold-out fold " + (i + 1) + "): " + f1Score);
+                double acrFold = neuralNet.getAvConvergenceRate();
+                totalACR += acrFold;
             }
 
-            // Average accuracy across all 10 folds
-            double averageAccuracy = totalAccuracy / 10;
-            double average01loss = total01loss / 10;
-            double averagePrecision = totalPrecision / 10;
-            double averageRecall = totalRecall / 10;
-            double averageF1 = totalF1 / 10;
-            System.out.println("Average Accuracy: " + averageAccuracy);
-            System.out.println("Average 0/1 Loss: " + average01loss);
-            System.out.println("Average Precision for class D1: " + averagePrecision);
-            System.out.println("Average Recall for class D1: " + averageRecall);
-            System.out.println("Average F1 for class D1: " + averageF1);
+            double AACR = totalACR / 10;
+            System.out.printf("Average Convergence Rate across all epochs across 10 folds: %.4f%n", AACR);
 
-        } catch (IOException e) {
+            double average01loss = total01loss / 10;
+            System.out.printf("Average 0/1 Loss: %.4f%n", average01loss);
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }

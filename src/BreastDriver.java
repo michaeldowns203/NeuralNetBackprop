@@ -60,11 +60,8 @@ public class BreastDriver {
             List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksC10(dataset, 10);
 
             // Loss instance variables
-            double totalAccuracy = 0;
-            double totalPrecision = 0;
-            double totalRecall = 0;
-            double totalF1 = 0;
             double total01loss = 0;
+            double totalACR = 0;
 
             for (int i = 0; i < 10; i++) {
                 List<List<Object>> trainingSet = new ArrayList<>();
@@ -74,10 +71,6 @@ public class BreastDriver {
                 List<Double> actualList = new ArrayList<>();
 
                 int correctPredictions = 0;
-                int truePositives = 0;
-                int falsePositives = 0;
-                int falseNegatives = 0;
-
 
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
@@ -123,24 +116,24 @@ public class BreastDriver {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {6,4};
+                int[] hiddenLayerSizes = {4,2};
                 int outputSize = 2;
                 String activationType = "softmax";
-                double learningRate = 0.001;
+                double learningRate = 0.0001;
                 boolean useMomentum = false;
-                double momentumCoefficient = 0.1;
+                double momentumCoefficient = 0.9;
 
                 NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
                 int maxEpochs = 100;
-                neuralNet.train(trainInputs, trainOutputsOHE, maxEpochs);
+                double tolerance = 0.0001;
+                neuralNet.train(trainInputs, trainOutputsOHE, tolerance, maxEpochs);
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
                     double actual = scaledTestData.get(t).get(scaledTestData.get(t).size() - 1);
 
-                    double benignOdds = prediction[0];
-                    if (benignOdds > 0.5)
+                    if (prediction[0] > 0.5)
                         predictedList.add(0.0);
                     else
                         predictedList.add(1.0);
@@ -151,62 +144,26 @@ public class BreastDriver {
                             Arrays.toString(testInputs[t]), predictedList.get(t), actual);
 
 
-                if (predictedList.get(t) == (actual)) {
-                    correctPredictions++;
-                }
-
-                // Get true positives, false positives, and false negatives
-                if (predictedList.get(t) == 1.0) {
-                    if (actual == 1.0) {
-                        truePositives++;
-                    } else {
-                        falsePositives++;
+                    if (predictedList.get(t) == (actual)) {
+                        correctPredictions++;
                     }
-                } else if (actual == 1.0) {
-                    falseNegatives++;
                 }
+                // Calculate 0/1 loss
+                double loss01 = 1.0 - (double) correctPredictions / testSet.size();
+                total01loss += loss01;
+                System.out.printf("Fold %d 0/1 loss: %.4f%n", i+1, loss01);
+
+                double acrFold = neuralNet.getAvConvergenceRate();
+                totalACR += acrFold;
             }
 
-            // Calculate precision and recall
-            double precision = truePositives / (double) (truePositives + falsePositives);
-            double recall = truePositives / (double) (truePositives + falseNegatives);
-            totalPrecision += precision;
-            totalRecall += recall;
+            double AACR = totalACR / 10;
+            System.out.printf("Average Convergence Rate across all epochs across 10 folds: %.4f%n", AACR);
 
-            double f1Score = 2 * (precision * recall) / (precision + recall);
-            totalF1 += f1Score;
-
-            // Calculate accuracy for this fold
-            double accuracy = (double) correctPredictions / testSet.size();
-            totalAccuracy += accuracy;
-
-            // Calculate 0/1 loss
-            double loss01 = 1.0 - (double) correctPredictions / testSet.size();
-            total01loss += loss01;
-
-            // Print loss info
-            System.out.println("Number of correct predictions: " + correctPredictions);
-            System.out.println("Number of test instances: " + testSet.size());
-            System.out.println("Fold " + (i + 1) + " Accuracy: " + accuracy);
-            System.out.println("Fold " + (i + 1) + " 0/1 loss: " + loss01);
-            System.out.println("Precision for class Malignant (4) (hold-out fold " + (i + 1) + "): " + precision);
-            System.out.println("Recall for class Malignant (4) (hold-out fold " + (i + 1) + "): " + recall);
-            System.out.println("F1 Score for class Malignant (4) (hold-out fold " + (i + 1) + "): " + f1Score);
-        }
-
-        // Average accuracy across all 10 folds
-        double averageAccuracy = totalAccuracy / 10;
-        double average01loss = total01loss / 10;
-        double averagePrecision = totalPrecision / 10;
-        double averageRecall = totalRecall / 10;
-        double averageF1 = totalF1 / 10;
-        System.out.println("Average Accuracy: " + averageAccuracy);
-        System.out.println("Average 0/1 Loss: " + average01loss);
-        System.out.println("Average Precision for class Malignant (4): " + averagePrecision);
-        System.out.println("Average Recall for class Malignant (4): " + averageRecall);
-        System.out.println("Average F1 for class Malignant (4): " + averageF1);
-
-    } catch (IOException e) {
+            double average01loss = total01loss / 10;
+            System.out.printf("Average 0/1 Loss: %.4f%n", average01loss);
+    }
+        catch (IOException e) {
         e.printStackTrace();
     }
 }

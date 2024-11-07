@@ -39,6 +39,7 @@ public class ComputerDriverPrint {
             List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksR(dataset, 10);
 
             double totalMSE = 0;
+            double totalACR = 0;
 
             for (int i = 0; i < 10; i++) {
                 List<List<Object>> trainingSet = new ArrayList<>();
@@ -48,7 +49,6 @@ public class ComputerDriverPrint {
                 List<Double> actualList = new ArrayList<>();
 
                 List<List<Object>> testSet = chunks.get(i);
-
 
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
@@ -92,7 +92,7 @@ public class ComputerDriverPrint {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {6, 4};
+                int[] hiddenLayerSizes = {5,5};
                 int outputSize = 1;
                 String activationType = "linear";
                 double learningRate = 0.001;
@@ -102,7 +102,8 @@ public class ComputerDriverPrint {
                 NeuralNetworkPrint neuralNet = new NeuralNetworkPrint(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
                 int maxEpochs = 1000;
-                neuralNet.train(trainInputs, trainOutputs, maxEpochs);
+                double tolerance = 0.0001;
+                neuralNet.train(trainInputs, trainOutputs, tolerance, maxEpochs);
 
                 neuralNet.printWeightsAndInputs();
                 neuralNet.printActivations();
@@ -117,16 +118,21 @@ public class ComputerDriverPrint {
                     System.out.printf("Test Instance: %s | Predicted: %.4f | Actual: %.4f%n",
                             Arrays.toString(testInputs[t]), prediction[0], actual);
                 }
-
                 double mse = LossFunctions.calculateMSE(actualList, predictedList);
                 totalMSE += mse;
-                System.out.println("Fold " + (i + 1) + " Mean Squared Error: " + mse);
+                System.out.printf("Fold %d Mean Squared Error: %.4f%n", i+1,  mse);
+
+                double acrFold = neuralNet.getAvConvergenceRate();
+                totalACR += acrFold;
             }
 
-            double averageMSE = totalMSE / 10;
-            System.out.println("Average Mean Squared Error across 10 folds: " + averageMSE);
+            double AACR = totalACR / 10;
+            System.out.printf("Average Convergence Rate across all epochs across 10 folds: %.4f%n", AACR);
 
-        } catch (IOException e) {
+            double averageMSE = totalMSE / 10;
+            System.out.printf("Average Mean Squared Error across 10 folds: %.4f%n", averageMSE);
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }

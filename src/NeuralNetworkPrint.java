@@ -208,15 +208,13 @@ public class NeuralNetworkPrint {
                 error[i] = 2 * (predictedOutput[i] - actualOutput[i]);
             }
         }
-
-        /*
+/*
         // Print gradient information for the output layer
         System.out.println("Gradient at the Output Layer:");
         for (int i = 0; i < error.length; i++) {
-            System.out.printf("Output Neuron %d: %.4f\n", i + 1, error[i]);
+            System.out.printf("Output Neuron %d: %.8f\n", i + 1, error[i]);
         }
-        */
-
+*/
         // No hidden layers, update directly
         if (hiddenLayerSizes.length == 0) {
             updateWeights(0, error);
@@ -268,26 +266,26 @@ public class NeuralNetworkPrint {
                 }
 
                 // Print the weight update details
-                //System.out.printf("Weight[%d][%d] before update: %.4f, Gradient: %8.4f, Update: %8.4f\n",
+                //System.out.printf("Weight[%d][%d] before update: %.8f, Gradient: %8.8f, Update: %8.8f\n",
                 //        i, j, weightMatrix[i][j], gradient, deltaW);
 
                 // Update the weight
                 weightMatrix[i][j] += deltaW;
 
                 // Print the updated weight
-                //System.out.printf("Weight[%d][%d] after update: %.4f\n", i, j, weightMatrix[i][j]);
+                //System.out.printf("Weight[%d][%d] after update: %.8f\n", i, j, weightMatrix[i][j]);
             }
 
             // Update biases
             for (int j = 0; j < biases.get(layerIdx).length; j++) {
                 double biasUpdate = -learningRate * delta[j];
-                //System.out.printf("Bias[%d] before update: %8.4f, Update: %.4f\n", j, biases.get(layerIdx)[j], biasUpdate);
+                //System.out.printf("Bias[%d] before update: %8.8f, Update: %.8f\n", j, biases.get(layerIdx)[j], biasUpdate);
                 biases.get(layerIdx)[j] += biasUpdate;
-                //System.out.printf("Bias[%d] after update: %.4f\n", j, biases.get(layerIdx)[j]);
+                //System.out.printf("Bias[%d] after update: %.8f\n", j, biases.get(layerIdx)[j]);
             }
         }
 
-        System.out.println();
+        //System.out.println();
     }
 
     // Sigmoid derivative for backpropagation
@@ -325,16 +323,49 @@ public class NeuralNetworkPrint {
         }
     }
 
+    public void train(double[][] inputData, double[][] targetData, double tolerance, int maxEpochs) {
+        List<Double> lossHistory = new ArrayList<>();
+        double previousLoss = Double.MAX_VALUE;
+        int epoch = 0;
 
-    public void train (double[][] inputData, double[][] targetData, int maxEpochs){
-        for (int epoch = 0; epoch < maxEpochs; epoch++) {
+        while (epoch < maxEpochs) {
+            double totalLoss = 0.0;
+
             for (int i = 0; i < inputData.length; i++) {
                 double[] input = inputData[i];
                 double[] target = targetData[i];
 
                 double[] predictedOutput = forwardPass(input);
                 backPropagation(target, predictedOutput);
+
+                // Calculate loss for the current instance (mean squared error)
+                for (int j = 0; j < target.length; j++) {
+                    totalLoss += Math.pow(target[j] - predictedOutput[j], 2);
+                }
             }
+
+            // Calculate average loss for the epoch
+            totalLoss /= inputData.length;
+            lossHistory.add(totalLoss);
+
+            // Print epoch and loss
+            System.out.println("Epoch " + epoch + ": Loss = " + totalLoss);
+
+            // Check for convergence
+            if (Math.abs(previousLoss - totalLoss) < tolerance) {
+                System.out.println("Convergence reached at epoch " + epoch + " with loss = " + totalLoss);
+                break;
+            }
+
+            previousLoss = totalLoss;
+            epoch++;
+        }
+
+        // Print convergence rate at the end of training
+        printConvergenceRate(lossHistory);
+
+        if (epoch == maxEpochs) {
+            System.out.println("Max epochs reached without full convergence.");
         }
     }
 
@@ -398,6 +429,45 @@ public class NeuralNetworkPrint {
         System.out.println();
     }
 
+    private double avConvergenceRate = 0;
 
+    public double getAvConvergenceRate() {
+        return avConvergenceRate;
+    }
+
+    public void printConvergenceRate(List<Double> lossHistory) {
+        if (lossHistory.size() < 2) {
+            System.out.println("Not enough data to calculate convergence rate.");
+            return;
+        }
+
+        double totalRate = 0.0;
+        int count = 0;
+
+        System.out.println("Convergence Rate per Epoch:");
+        for (int i = 1; i < lossHistory.size(); i++) {
+            double previousLoss = lossHistory.get(i - 1);
+            double currentLoss = lossHistory.get(i);
+
+            if (previousLoss != 0) {
+                double rate = Math.abs((previousLoss - currentLoss) / previousLoss);
+                System.out.printf("Epoch %d to %d: %.6f\n", i - 1, i, rate);
+
+                totalRate += rate;
+                count++;
+            } else {
+                System.out.printf("Epoch %d to %d: Undefined (previous loss was zero)\n", i - 1, i);
+            }
+        }
+
+        // Calculate and print the average convergence rate
+        if (count > 0) {
+            double averageRate = totalRate / count;
+            System.out.printf("Average Convergence Rate: %.6f\n", averageRate);
+            avConvergenceRate = averageRate;
+        } else {
+            System.out.println("Average Convergence Rate: Undefined (no valid epochs to calculate)");
+        }
+    }
 
 }

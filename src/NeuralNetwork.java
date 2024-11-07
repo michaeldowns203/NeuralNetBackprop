@@ -56,23 +56,18 @@ public class NeuralNetwork {
             biases.add(new double[outputSize]);
             deltaWeights.add(new double[hiddenLayerSizes[hiddenLayerSizes.length - 1]][outputSize]);
         }
-
-        //xaiver initialization
         for (double[][] layerWeights : weights) {
             for (int i = 0; i < layerWeights.length; i++) {
                 for (int j = 0; j < layerWeights[i].length; j++) {
-                    layerWeights[i][j] = rand.nextGaussian() * Math.sqrt(2.0 / (layerWeights.length + layerWeights[0].length));
-
+                    layerWeights[i][j] = rand.nextGaussian() * Math.sqrt(1.0 / (layerWeights.length + layerWeights[0].length));
                 }
             }
         }
-        // Random initialization for biases
         for (int i = 0; i < biases.size(); i++) {
             for (int j = 0; j < biases.get(i).length; j++) {
                 biases.get(i)[j] = rand.nextGaussian() * 0.01;  // Small random values for bias
             }
         }
-
     }
 
     // Sigmoid activation function for hidden layers
@@ -306,16 +301,46 @@ public class NeuralNetwork {
         }
     }
 
+    public void train(double[][] inputData, double[][] targetData, double tolerance, int maxEpochs) {
+        List<Double> lossHistory = new ArrayList<>();
+        double previousLoss = Double.MAX_VALUE;
+        int epoch = 0;
 
-    public void train (double[][] inputData, double[][] targetData, int maxEpochs){
-        for (int epoch = 0; epoch < maxEpochs; epoch++) {
+        while (epoch < maxEpochs) {
+            double totalLoss = 0.0;
+
             for (int i = 0; i < inputData.length; i++) {
                 double[] input = inputData[i];
                 double[] target = targetData[i];
 
                 double[] predictedOutput = forwardPass(input);
                 backPropagation(target, predictedOutput);
+
+                // Calculate loss for the current instance (mean squared error)
+                for (int j = 0; j < target.length; j++) {
+                    totalLoss += Math.pow(target[j] - predictedOutput[j], 2);
+                }
             }
+
+            // Calculate average loss for the epoch
+            totalLoss /= inputData.length;
+            lossHistory.add(totalLoss);
+
+            // Check for convergence
+            if (Math.abs(previousLoss - totalLoss) < tolerance) {
+                System.out.println("Convergence reached at epoch " + epoch + " with loss = " + totalLoss);
+                break;
+            }
+
+            previousLoss = totalLoss;
+            epoch++;
+        }
+
+        // Print convergence rate at the end of training
+        printConvergenceRate(lossHistory);
+
+        if (epoch == maxEpochs) {
+            System.out.println("Max epochs reached without full convergence.");
         }
     }
 
@@ -329,4 +354,33 @@ public class NeuralNetwork {
         }
     }
 
+    private double avConvergenceRate = 0;
+
+    public double getAvConvergenceRate() {
+        return avConvergenceRate;
+    }
+
+    public void printConvergenceRate(List<Double> lossHistory) {
+        double totalRate = 0.0;
+        int count = 0;
+
+        for (int i = 1; i < lossHistory.size(); i++) {
+            double previousLoss = lossHistory.get(i - 1);
+            double currentLoss = lossHistory.get(i);
+
+            double rate = Math.abs((previousLoss - currentLoss) / previousLoss);
+
+            totalRate += rate;
+            count++;
+        }
+
+        // Calculate and print the average convergence rate
+        if (count > 0) {
+            double averageRate = totalRate / count;
+            System.out.printf("Average Convergence Rate: %.6f\n", averageRate);
+            avConvergenceRate = averageRate;
+        } else {
+            System.out.println("Average Convergence Rate: Undefined (no valid epochs to calculate)");
+        }
+    }
 }
