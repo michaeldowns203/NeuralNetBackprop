@@ -12,7 +12,7 @@ public class AbaloneDriver2 {
 
     public static void main(String[] args) throws IOException {
         try {
-            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/abalone.data");
+            InputStream input = AbaloneDriver2.class.getResourceAsStream("/data/abalone.data");
             InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
 

@@ -13,7 +13,7 @@ public class GlassDriver {
 
     public static void main(String[] args) throws IOException {
         try {
-            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/glass.data");
+            InputStream input = GlassDriver.class.getResourceAsStream("/data/glass.data");
             InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
 

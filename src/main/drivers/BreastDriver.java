@@ -12,7 +12,7 @@ public class BreastDriver {
 
     public static void main(String[] args) throws IOException {
         try {
-            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/breast-cancer-wisconsin.data");
+            InputStream input = BreastDriver.class.getResourceAsStream("/data/breast-cancer-wisconsin.data");
             InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
 

@@ -12,7 +12,7 @@ public class ComputerDriverPrint {
 
     public static void main(String[] args) throws IOException {
         try {
-            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/machine.data");
+            InputStream input = ComputerDriverPrint.class.getResourceAsStream("/data/machine.data");
             InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
 

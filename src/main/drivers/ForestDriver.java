@@ -13,7 +13,7 @@ public class ForestDriver {
 
     public static void main(String[] args) throws IOException {
         try {
-            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/forestfires.data");
+            InputStream input = ForestDriver.class.getResourceAsStream("/data/forestfires.data");
             InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
 
