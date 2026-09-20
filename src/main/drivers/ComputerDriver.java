@@ -1,25 +1,19 @@
+package main.drivers;
+
+import main.nn.NeuralNetwork;
+import main.utils.LossFunctions;
+import main.utils.MinMaxScale;
+import main.utils.TenFoldCrossValidation;
 import java.util.*;
 import java.io.*;
 
-//test model - normal 10 fold
-public class ComputerDriverPrint {
+public class ComputerDriver {
 
     public static void main(String[] args) throws IOException {
-        String inputFile1 = "src/machine.data";
         try {
-            FileInputStream fis = new FileInputStream(inputFile1);
-            InputStreamReader isr = new InputStreamReader(fis);
+            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/machine.data");
+            InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
-
-            int lineCount = 0;
-            while (stdin.readLine() != null) {
-                lineCount++;
-            }
-
-            stdin.close();
-            fis = new FileInputStream(inputFile1);
-            isr = new InputStreamReader(fis);
-            stdin = new BufferedReader(isr);
 
             List<List<Object>> dataset = new ArrayList<>();
             String line;
@@ -35,8 +29,11 @@ public class ComputerDriverPrint {
 
             stdin.close();
 
-            //List<List<Object>> testSet = extractTenPercent(dataset);
-            List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksR(dataset, 10);
+            // Extract stratified tuning data (10%)
+            List<List<Object>> testSet = TenFoldCrossValidation.extractTenPercentR(dataset);
+
+            // Split the remaining dataset into stratified chunks
+            List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksR10(dataset, 10);
 
             double totalMSE = 0;
             double totalACR = 0;
@@ -48,15 +45,11 @@ public class ComputerDriverPrint {
                 List<Double> predictedList = new ArrayList<>();
                 List<Double> actualList = new ArrayList<>();
 
-                List<List<Object>> testSet = chunks.get(i);
 
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            List<Object> all = new ArrayList<>();
-                            for (int k = 0; k < row.size(); k++) {
-                                all.add((Double) row.get(k));
-                            }
+                            List<Object> all = new ArrayList<>(row);
                             trainingSet.add(all);
                         }
                     }
@@ -92,21 +85,18 @@ public class ComputerDriverPrint {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {5,5};
+                int[] hiddenLayerSizes = {2,1};
                 int outputSize = 1;
                 String activationType = "linear";
-                double learningRate = 0.001;
-                boolean useMomentum = true;
-                double momentumCoefficient = 0.5;
+                double learningRate = 0.01;
+                boolean useMomentum = false;
+                double momentumCoefficient = 0.9;
 
-                NeuralNetworkPrint neuralNet = new NeuralNetworkPrint(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
+                NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
                 int maxEpochs = 1000;
                 double tolerance = 0.0001;
                 neuralNet.train(trainInputs, trainOutputs, tolerance, maxEpochs);
-
-                neuralNet.printWeightsAndInputs();
-                neuralNet.printActivations();
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
@@ -118,6 +108,7 @@ public class ComputerDriverPrint {
                     System.out.printf("Test Instance: %s | Predicted: %.4f | Actual: %.4f%n",
                             Arrays.toString(testInputs[t]), prediction[0], actual);
                 }
+
                 double mse = LossFunctions.calculateMSE(actualList, predictedList);
                 totalMSE += mse;
                 System.out.printf("Fold %d Mean Squared Error: %.4f%n", i+1,  mse);

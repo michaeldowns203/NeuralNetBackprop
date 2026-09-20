@@ -1,16 +1,18 @@
+package main.nn;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 public class NeuralNetworkPrint {
-    private int inputSize;
-    private int[] hiddenLayerSizes;
-    private int outputSize;
-    private String activationType;
-    private double learningRate;
-    private boolean useMomentum;
-    private double momentumCoefficient;
+    private final int inputSize;
+    private final int[] hiddenLayerSizes;
+    private final int outputSize;
+    private final String activationType;
+    private final double learningRate;
+    private final boolean useMomentum;
+    private final double momentumCoefficient;
 
     private List<double[][]> weights;
     private List<double[]> biases;
@@ -67,9 +69,9 @@ public class NeuralNetworkPrint {
             }
         }
         // Random initialization for biases
-        for (int i = 0; i < biases.size(); i++) {
-            for (int j = 0; j < biases.get(i).length; j++) {
-                biases.get(i)[j] = rand.nextGaussian() * 0.01;  // Small random values for bias
+        for (double[] bias : biases) {
+            for (int j = 0; j < bias.length; j++) {
+                bias[j] = rand.nextGaussian() * 0.01;  // Small random values for bias
             }
         }
 
@@ -118,7 +120,7 @@ public class NeuralNetworkPrint {
 
         if (hiddenLayerSizes.length == 0) {
             // Directly go from input to output if no hidden layers
-            double[] finalOutput = new double[outputSize];
+            double[] finalOutput;
             double[] z = new double[outputSize];
 
             for (int j = 0; j < outputSize; j++) {
@@ -168,7 +170,7 @@ public class NeuralNetworkPrint {
         }
 
         // Output layer activation (softmax or linear)
-        double[] finalOutput = new double[outputSize];
+        double[] finalOutput;
         double[] z = new double[outputSize];
 
         // For the output layer, compute the weighted sum
@@ -297,7 +299,7 @@ public class NeuralNetworkPrint {
     private double[] inputLayer;
 
     // Store the output of each layer after forward pass
-    private List<double[]> layerOutputs = new ArrayList<>();
+    private final List<double[]> layerOutputs = new ArrayList<>();
 
     // Helper to retrieve the input to the network
     private double[] getInputLayer() {

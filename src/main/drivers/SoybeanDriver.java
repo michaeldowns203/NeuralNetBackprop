@@ -1,29 +1,21 @@
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+package main.drivers;
+
+import main.nn.NeuralNetwork;
+import main.utils.MinMaxScale;
+import main.utils.OneHotEncoder;
+import main.utils.TenFoldCrossValidation;
+
+import java.io.*;
 import java.util.*;
-//normal 10 fold
-public class BreastDriver2 {
+
+//10% cross validation for tuning
+public class SoybeanDriver {
 
     public static void main(String[] args) throws IOException {
-        String inputFile1 = "src/breast-cancer-wisconsin.data";
         try {
-            FileInputStream fis = new FileInputStream(inputFile1);
-            InputStreamReader isr = new InputStreamReader(fis);
+            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/soybean-small.data");
+            InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
-
-            // First, count the number of lines to determine the size of the lists
-            int lineCount = 0;
-            while (stdin.readLine() != null) {
-                lineCount++;
-            }
-
-            // Reset the reader to the beginning of the file
-            stdin.close();
-            fis = new FileInputStream(inputFile1);
-            isr = new InputStreamReader(fis);
-            stdin = new BufferedReader(isr);
 
             // Initialize the lists
             List<List<Object>> dataset = new ArrayList<>();
@@ -38,15 +30,13 @@ public class BreastDriver2 {
                 List<Object> row = new ArrayList<>();
 
                 // Assign the label (last column)
-                labels.add(Double.parseDouble(rawData[10]));
+                String label = rawData[35];
+                String numLabel = label.replaceAll("[^0-9.]", "");
+                labels.add(Double.parseDouble(numLabel));
 
-                // Fill the data row (columns 2 to 10)
-                for (int i = 1; i < rawData.length - 1; i++) {
-                    if (rawData[i].equals("?")) {
-                        row.add((Math.random() * 10) + 1); // Handle missing values
-                    } else {
-                        row.add(Double.parseDouble(rawData[i]));
-                    }
+                // Fill the data rows
+                for (int i = 0; i < rawData.length - 1; i++) {
+                    row.add(Double.parseDouble(rawData[i]));
                 }
                 row.add(labels.get(lineNum)); // Add the label to the row
                 dataset.add(row);
@@ -55,31 +45,30 @@ public class BreastDriver2 {
 
             stdin.close();
 
+            // Extract 10% of the dataset for testing
+            List<List<Object>> testSet = TenFoldCrossValidation.extractTenPercentC(dataset);
+
             // Split the remaining dataset into stratified chunks
-            List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksC(dataset, 10);
+            List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksC10(dataset, 10);
 
             // Loss instance variables
             double total01loss = 0;
-            double totalACR = 0;
+            double totalACR= 0;
 
             for (int i = 0; i < 10; i++) {
                 List<List<Object>> trainingSet = new ArrayList<>();
                 List<List<Double>> trainingData = new ArrayList<>();
                 List<List<Double>> trainingLabels = new ArrayList<>();
-                List<Double> predictedList = new ArrayList<>();
-                List<Double> actualList = new ArrayList<>();
-
-                List<List<Object>> testSet = chunks.get(i);
+                List<Integer> predictedList = new ArrayList<>();
+                List<Integer> actualList = new ArrayList<>();
 
                 int correctPredictions = 0;
+
 
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            List<Object> all = new ArrayList<>();
-                            for (int k = 0; k < row.size(); k++) {
-                                all.add((Double) row.get(k));
-                            }
+                            List<Object> all = new ArrayList<>(row);
                             trainingSet.add(all);
                         }
                     }
@@ -117,37 +106,63 @@ public class BreastDriver2 {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {4,2};
-                int outputSize = 2;
+                int[] hiddenLayerSizes = {5,3};
+                int outputSize = 4;
                 String activationType = "softmax";
-                double learningRate = 0.0001;
-                boolean useMomentum = false;
+                double learningRate = 0.001;
+                boolean useMomentum = true;
                 double momentumCoefficient = 0.9;
 
                 NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
-                int maxEpochs = 100;
+                int maxEpochs = 1000;
                 double tolerance = 0.0001;
                 neuralNet.train(trainInputs, trainOutputsOHE, tolerance, maxEpochs);
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
                     double actual = scaledTestData.get(t).get(scaledTestData.get(t).size() - 1);
+                    int actualClass = 0;
 
-                    if (prediction[0] > 0.5)
-                        predictedList.add(0.0);
+                    if (actual == 0.0)
+                        actualClass = 1;
+                    else if (actual < 0.4)
+                        actualClass = 2;
+                    else if (actual < 0.8)
+                        actualClass = 3;
                     else
-                        predictedList.add(1.0);
+                        actualClass = 4;
 
-                    actualList.add(actual);
+                    double maxProb = prediction[0];
+                    int maxIndex = 0;
 
-                    System.out.printf("Test Instance: %s | Predicted: %.4f | Actual: %.4f%n",
-                            Arrays.toString(testInputs[t]), predictedList.get(t), actual);
+                    for (int g = 1; g < prediction.length; g++) {
+                        if (prediction[g] > maxProb) {
+                            maxProb = prediction[g];
+                            maxIndex = g;
+                        }
+                    }
 
-                    if (predictedList.get(t) == (actual)) {
+                    if (maxIndex == 0)
+                        predictedList.add(1);
+                    else if (maxIndex == 1)
+                        predictedList.add(2);
+                    else if (maxIndex == 2)
+                        predictedList.add(3);
+                    else
+                        predictedList.add(4);
+
+                    actualList.add(actualClass);
+
+                    System.out.printf("Test Instance: %s | Predicted: %d | Actual: %d%n",
+                            Arrays.toString(testInputs[t]), predictedList.get(t), actualClass);
+
+
+                    if (predictedList.get(t).equals(actualClass)) {
                         correctPredictions++;
                     }
                 }
+
                 // Calculate 0/1 loss
                 double loss01 = 1.0 - (double) correctPredictions / testSet.size();
                 total01loss += loss01;
@@ -167,7 +182,4 @@ public class BreastDriver2 {
             e.printStackTrace();
         }
     }
-
 }
-
-

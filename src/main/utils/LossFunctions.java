@@ -1,3 +1,5 @@
+package main.utils;
+
 import java.util.List;
 
 public class LossFunctions {

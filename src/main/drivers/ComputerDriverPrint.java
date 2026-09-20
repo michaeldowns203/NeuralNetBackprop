@@ -1,67 +1,38 @@
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.*;
+package main.drivers;
 
-//10% cross validation for tuning
-public class AbaloneDriver2 {
+import main.nn.NeuralNetworkPrint;
+import main.utils.LossFunctions;
+import main.utils.MinMaxScale;
+import main.utils.TenFoldCrossValidation;
+import java.util.*;
+import java.io.*;
+
+//test model - normal 10 fold
+public class ComputerDriverPrint {
 
     public static void main(String[] args) throws IOException {
-        String inputFile1 = "src/abalone.data";
         try {
-            FileInputStream fis = new FileInputStream(inputFile1);
-            InputStreamReader isr = new InputStreamReader(fis);
+            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/machine.data");
+            InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
 
-            // First, count the number of lines to determine the size of the lists
-            int lineCount = 0;
-            while (stdin.readLine() != null) {
-                lineCount++;
-            }
-            // Reset the reader to the beginning of the file
-            stdin.close();
-            fis = new FileInputStream(inputFile1);
-            isr = new InputStreamReader(fis);
-            stdin = new BufferedReader(isr);
-
-            // Initialize the lists
             List<List<Object>> dataset = new ArrayList<>();
-            List<Object> labels = new ArrayList<>();
-
             String line;
-            //instance variable; flag to skip the first line
-            boolean firstLine = true;
-            int lineNum = 0;
 
-            // Read the file and fill the dataset
             while ((line = stdin.readLine()) != null) {
-                //skips the first line as it includes headers not data
-                if (firstLine) {
-                    firstLine = false;
-                    continue;
-                }
                 String[] rawData = line.split(",");
                 List<Object> row = new ArrayList<>();
-
-                // Assign the label (last column)
-                labels.add(Double.parseDouble(rawData[8]));
-
-                // Fill the data row
-                for (int i = 0; i < rawData.length - 2; i++) {
-                    row.add(Double.parseDouble(rawData[i + 1]));
+                for (int i = 2; i <= 8; i++) {
+                    row.add(Double.parseDouble(rawData[i]));
                 }
-                row.add(labels.get(lineNum)); // Add the label to the row
                 dataset.add(row);
-                lineNum++;
             }
 
             stdin.close();
 
-            // Split the remaining dataset into stratified chunks
+            //List<List<Object>> testSet = extractTenPercent(dataset);
             List<List<List<Object>>> chunks = TenFoldCrossValidation.splitIntoStratifiedChunksR(dataset, 10);
 
-            // Loss instance variables
             double totalMSE = 0;
             double totalACR = 0;
 
@@ -77,10 +48,7 @@ public class AbaloneDriver2 {
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            List<Object> all = new ArrayList<>();
-                            for (int k = 0; k < row.size(); k++) {
-                                all.add((Double) row.get(k));
-                            }
+                            List<Object> all = new ArrayList<>(row);
                             trainingSet.add(all);
                         }
                     }
@@ -116,18 +84,21 @@ public class AbaloneDriver2 {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {3,1};
+                int[] hiddenLayerSizes = {5,5};
                 int outputSize = 1;
                 String activationType = "linear";
                 double learningRate = 0.001;
-                boolean useMomentum = false;
-                double momentumCoefficient = 0.9;
+                boolean useMomentum = true;
+                double momentumCoefficient = 0.5;
 
-                NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
+                NeuralNetworkPrint neuralNet = new NeuralNetworkPrint(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
-                int maxEpochs = 100;
+                int maxEpochs = 1000;
                 double tolerance = 0.0001;
                 neuralNet.train(trainInputs, trainOutputs, tolerance, maxEpochs);
+
+                neuralNet.printWeightsAndInputs();
+                neuralNet.printActivations();
 
                 for (int t = 0; t < testInputs.length; t++) {
                     double[] prediction = neuralNet.forwardPass(testInputs[t]);
@@ -158,4 +129,3 @@ public class AbaloneDriver2 {
         }
     }
 }
-

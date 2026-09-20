@@ -1,29 +1,20 @@
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+package main.drivers;
+
+import main.nn.NeuralNetwork;
+import main.utils.LossFunctions;
+import main.utils.MinMaxScale;
+import main.utils.TenFoldCrossValidation;
+import java.io.*;
 import java.util.*;
 
-//normal 10 fold
-public class ForestDriver2 {
+//10% cross validation for tuning
+public class AbaloneDriver2 {
 
     public static void main(String[] args) throws IOException {
-        String inputFile1 = "src/forestfires.data";
         try {
-            FileInputStream fis = new FileInputStream(inputFile1);
-            InputStreamReader isr = new InputStreamReader(fis);
+            InputStream input = AbaloneDriver.class.getResourceAsStream("/data/abalone.data");
+            InputStreamReader isr = new InputStreamReader(input);
             BufferedReader stdin = new BufferedReader(isr);
-
-            // First, count the number of lines to determine the size of the lists
-            int lineCount = 0;
-            while (stdin.readLine() != null) {
-                lineCount++;
-            }
-            // Reset the reader to the beginning of the file
-            stdin.close();
-            fis = new FileInputStream(inputFile1);
-            isr = new InputStreamReader(fis);
-            stdin = new BufferedReader(isr);
 
             // Initialize the lists
             List<List<Object>> dataset = new ArrayList<>();
@@ -45,11 +36,11 @@ public class ForestDriver2 {
                 List<Object> row = new ArrayList<>();
 
                 // Assign the label (last column)
-                labels.add(Double.parseDouble(rawData[12]));
+                labels.add(Double.parseDouble(rawData[8]));
 
                 // Fill the data row
-                for (int i = 0; i < 7; i++) {
-                    row.add(Double.parseDouble(rawData[i + 4]));
+                for (int i = 0; i < rawData.length - 2; i++) {
+                    row.add(Double.parseDouble(rawData[i + 1]));
                 }
                 row.add(labels.get(lineNum)); // Add the label to the row
                 dataset.add(row);
@@ -77,10 +68,7 @@ public class ForestDriver2 {
                 for (int j = 0; j < 10; j++) {
                     if (j != i) {
                         for (List<Object> row : chunks.get(j)) {
-                            List<Object> all = new ArrayList<>();
-                            for (int k = 0; k < row.size(); k++) {
-                                all.add((Double) row.get(k));
-                            }
+                            List<Object> all = new ArrayList<>(row);
                             trainingSet.add(all);
                         }
                     }
@@ -116,12 +104,12 @@ public class ForestDriver2 {
                 }
 
                 int inputSize = trainInputs[0].length;
-                int[] hiddenLayerSizes = {4,2};
+                int[] hiddenLayerSizes = {3,1};
                 int outputSize = 1;
                 String activationType = "linear";
                 double learningRate = 0.001;
                 boolean useMomentum = false;
-                double momentumCoefficient = 0.5;
+                double momentumCoefficient = 0.9;
 
                 NeuralNetwork neuralNet = new NeuralNetwork(inputSize, hiddenLayerSizes, outputSize, activationType, learningRate, useMomentum, momentumCoefficient);
 
@@ -158,6 +146,4 @@ public class ForestDriver2 {
         }
     }
 }
-
-
 
